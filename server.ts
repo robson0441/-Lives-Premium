@@ -165,11 +165,13 @@ async function startServer() {
     }
   });
 
-  // Sync users from client local storage (for ephemeral hosting recovery)
+  // Sync users and database from client local storage (for ephemeral hosting recovery)
   app.post('/api/auth/sync-users', (req, res) => {
-    const { customUsers } = req.body;
+    const { customUsers, customApplications, customWithdrawals, customTransactions, customLives } = req.body;
+    let updated = false;
+
+    // 1. Sync custom users
     if (customUsers && Array.isArray(customUsers)) {
-      let updated = false;
       customUsers.forEach((u: User) => {
         if (u && u.id) {
           if (!db.users[u.id]) {
@@ -185,11 +187,93 @@ async function startServer() {
           }
         }
       });
-      if (updated) {
-        saveDatabase(db);
-      }
     }
-    res.json({ success: true });
+
+    // 2. Sync host applications
+    if (customApplications && Array.isArray(customApplications)) {
+      customApplications.forEach((app: HostApplication) => {
+        if (app && app.id) {
+          if (!db.hostApplications[app.id]) {
+            db.hostApplications[app.id] = app;
+            updated = true;
+          } else {
+            const existing = db.hostApplications[app.id];
+            // If the server changed state (approved/rejected), retain server status, otherwise merge
+            if (existing.status !== app.status && existing.status !== 'pending') {
+              // server takes precedence
+            } else {
+              db.hostApplications[app.id] = { ...app, ...existing };
+            }
+          }
+        }
+      });
+    }
+
+    // 3. Sync withdrawals
+    if (customWithdrawals && Array.isArray(customWithdrawals)) {
+      customWithdrawals.forEach((wd: Withdrawal) => {
+        if (wd && wd.id) {
+          const idx = db.withdrawals.findIndex(w => w.id === wd.id);
+          if (idx === -1) {
+            db.withdrawals.push(wd);
+            updated = true;
+          } else {
+            const existing = db.withdrawals[idx];
+            if (existing.status !== wd.status && existing.status !== 'pending') {
+              // server status wins
+            } else {
+              db.withdrawals[idx] = { ...wd, ...existing };
+            }
+          }
+        }
+      });
+    }
+
+    // 4. Sync transactions
+    if (customTransactions && Array.isArray(customTransactions)) {
+      customTransactions.forEach((tx: Transaction) => {
+        if (tx && tx.id) {
+          const idx = db.transactions.findIndex(t => t.id === tx.id);
+          if (idx === -1) {
+            db.transactions.push(tx);
+            updated = true;
+          } else {
+            const existing = db.transactions[idx];
+            if (existing.status !== tx.status && existing.status !== 'pending') {
+              // server wins
+            } else {
+              db.transactions[idx] = { ...tx, ...existing };
+            }
+          }
+        }
+      });
+    }
+
+    // 5. Sync active lives
+    if (customLives && Array.isArray(customLives)) {
+      customLives.forEach((room: LiveRoom) => {
+        if (room && room.id) {
+          if (!db.lives[room.id]) {
+            db.lives[room.id] = room;
+            updated = true;
+          } else {
+            db.lives[room.id] = { ...room, ...db.lives[room.id] };
+          }
+        }
+      });
+    }
+
+    if (updated) {
+      saveDatabase(db);
+    }
+
+    res.json({
+      success: true,
+      usersCount: Object.keys(db.users).length,
+      appsCount: Object.keys(db.hostApplications).length,
+      withdrawalsCount: db.withdrawals.length,
+      txCount: db.transactions.length,
+    });
   });
 
   // Login handler

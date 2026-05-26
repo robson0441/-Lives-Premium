@@ -92,26 +92,101 @@ export default function App() {
   const animatedMessageIdsRef = useRef<Set<string>>(new Set());
   const chatInitializedRef = useRef<boolean>(false);
 
+  // Synchronize all collections with local storage to avoid ephemeral hosting resets
+  const syncAllCollections = async (extraData?: {
+    customUsers?: User[];
+    customApplications?: HostApplication[];
+    customWithdrawals?: Withdrawal[];
+    customTransactions?: Transaction[];
+    customLives?: LiveRoom[];
+  }) => {
+    try {
+      const getLocalStorageItem = (key: string) => {
+        const stored = localStorage.getItem(key);
+        if (stored) {
+          try {
+            const parsed = JSON.parse(stored);
+            if (Array.isArray(parsed)) return parsed;
+          } catch(e) {}
+        }
+        return [];
+      };
+
+      let users = getLocalStorageItem('live_premium_custom_users');
+      let apps = getLocalStorageItem('live_premium_custom_applications');
+      let withdrawals = getLocalStorageItem('live_premium_custom_withdrawals');
+      let transactions = getLocalStorageItem('live_premium_custom_transactions');
+      let lives = getLocalStorageItem('live_premium_custom_lives');
+
+      if (extraData) {
+        if (extraData.customUsers) {
+          extraData.customUsers.forEach((u) => {
+            if (u && u.id) {
+              const idx = users.findIndex((item: any) => item.id === u.id);
+              if (idx !== -1) users[idx] = u; else users.push(u);
+            }
+          });
+          localStorage.setItem('live_premium_custom_users', JSON.stringify(users));
+        }
+        if (extraData.customApplications) {
+          extraData.customApplications.forEach((a) => {
+            if (a && a.id) {
+              const idx = apps.findIndex((item: any) => item.id === a.id);
+              if (idx !== -1) apps[idx] = a; else apps.push(a);
+            }
+          });
+          localStorage.setItem('live_premium_custom_applications', JSON.stringify(apps));
+        }
+        if (extraData.customWithdrawals) {
+          extraData.customWithdrawals.forEach((w) => {
+            if (w && w.id) {
+              const idx = withdrawals.findIndex((item: any) => item.id === w.id);
+              if (idx !== -1) withdrawals[idx] = w; else withdrawals.push(w);
+            }
+          });
+          localStorage.setItem('live_premium_custom_withdrawals', JSON.stringify(withdrawals));
+        }
+        if (extraData.customTransactions) {
+          extraData.customTransactions.forEach((t) => {
+            if (t && t.id) {
+              const idx = transactions.findIndex((item: any) => item.id === t.id);
+              if (idx !== -1) transactions[idx] = t; else transactions.push(t);
+            }
+          });
+          localStorage.setItem('live_premium_custom_transactions', JSON.stringify(transactions));
+        }
+        if (extraData.customLives) {
+          extraData.customLives.forEach((l) => {
+            if (l && l.id) {
+              const idx = lives.findIndex((item: any) => item.id === l.id);
+              if (idx !== -1) lives[idx] = l; else lives.push(l);
+            }
+          });
+          localStorage.setItem('live_premium_custom_lives', JSON.stringify(lives));
+        }
+      }
+
+      await fetch('/api/auth/sync-users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customUsers: users,
+          customApplications: apps,
+          customWithdrawals: withdrawals,
+          customTransactions: transactions,
+          customLives: lives,
+        })
+      });
+    } catch (err) {
+      console.error("Failed to sync collections with server:", err);
+    }
+  };
+
   // Initialize application and fetch base user profile
   useEffect(() => {
     const initializeAndSync = async () => {
-      // Fetch custom users from local storage to handle ephemeral hosting recovery
-      const stored = localStorage.getItem('live_premium_custom_users');
-      if (stored) {
-        try {
-          const customUsers = JSON.parse(stored);
-          if (Array.isArray(customUsers) && customUsers.length > 0) {
-            // Sync with backend so the ephemeral server has them
-            await fetch('/api/auth/sync-users', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ customUsers })
-            }).catch(err => console.error("Could not sync users on mount:", err));
-          }
-        } catch (e) {
-          console.error("Error reading local custom users during boot:", e);
-        }
-      }
+      // Sync everything from local storage to survive ephemeral server scale/wipes
+      await syncAllCollections();
       
       // Continue normal boot loading sequence
       fetchUserData();
@@ -129,29 +204,9 @@ export default function App() {
   useEffect(() => {
     if (currentUser) {
       localStorage.setItem('live_premium_user_id', currentUser.id);
-
-      try {
-        let customUsers: User[] = [];
-        const stored = localStorage.getItem('live_premium_custom_users');
-        if (stored) {
-          try { customUsers = JSON.parse(stored); } catch (e) {}
-        }
-        if (!Array.isArray(customUsers)) {
-          customUsers = [];
-        }
-
-        const idx = customUsers.findIndex((u) => u.id === currentUser.id);
-        if (idx !== -1) {
-          customUsers[idx] = currentUser;
-        } else {
-          customUsers.push(currentUser);
-        }
-        localStorage.setItem('live_premium_custom_users', JSON.stringify(customUsers));
-      } catch (err) {
-        console.error("Failed saving user profile to local cache:", err);
-      }
+      syncAllCollections({ customUsers: [currentUser] });
     }
-  }, [currentUser]);
+  }, [currentUser?.id]);
 
   // Update dynamic logs and workspace permissions when currentUser state changes (e.g., toggled roles)
   useEffect(() => {
@@ -415,7 +470,13 @@ export default function App() {
       const txRes = await fetch(`/api/transactions`, {
         headers: { 'x-user-id': currentUser.id }
       });
-      if (txRes.ok) setUserTxHistory(await txRes.json());
+      if (txRes.ok) {
+        const txData = await txRes.json();
+        setUserTxHistory(txData);
+        if (Array.isArray(txData) && txData.length > 0) {
+          localStorage.setItem('live_premium_custom_transactions', JSON.stringify(txData));
+        }
+      }
 
       // Fetch dynamic audits if user is admin
       if (currentUser.role === 'admin') {
@@ -423,8 +484,16 @@ export default function App() {
           fetch('/api/host/applications'),
           fetch('/api/admin/withdrawals')
         ]);
-        if (appRes.ok) setHostApplicationsList(await appRes.json());
-        if (withdrawRes.ok) setAllWithdrawalsAdmin(await withdrawRes.json());
+        if (appRes.ok) {
+          const appsData = await appRes.json();
+          setHostApplicationsList(appsData);
+          localStorage.setItem('live_premium_custom_applications', JSON.stringify(appsData));
+        }
+        if (withdrawRes.ok) {
+          const withdrawsData = await withdrawRes.json();
+          setAllWithdrawalsAdmin(withdrawsData);
+          localStorage.setItem('live_premium_custom_withdrawals', JSON.stringify(withdrawsData));
+        }
         fetchAdminWhatsapp();
       }
 
@@ -433,7 +502,11 @@ export default function App() {
         const myWdRes = await fetch('/api/host/withdrawals', {
           headers: { 'x-user-id': currentUser.id }
         });
-        if (myWdRes.ok) setWithdrawList(await myWdRes.json());
+        if (myWdRes.ok) {
+          const wdData = await myWdRes.json();
+          setWithdrawList(wdData);
+          localStorage.setItem('live_premium_custom_withdrawals', JSON.stringify(wdData));
+        }
       }
     } catch (e) {
       console.error(e);
@@ -715,7 +788,11 @@ export default function App() {
       });
 
       if (res.ok) {
+        const data = await res.json();
         addNotification("Candidatura enviada para revisão! Aguarde aprovação imediata do Admin no menu superior.", "success");
+        if (data.application) {
+          await syncAllCollections({ customApplications: [data.application] });
+        }
         fetchUserData();
         fetchSystemLogsAndApplications();
         // Clear forms
