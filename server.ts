@@ -181,7 +181,11 @@ async function startServer() {
             const existing = db.users[u.id];
             const isStandardUser = ['user_robson', 'host_lorena', 'host_thiago', 'host_babi', 'admin_contas'].includes(u.id);
             if (!isStandardUser) {
-              db.users[u.id] = { ...existing, ...u };
+              // Merge safely preserving server values for critical/authoritative fields
+              db.users[u.id] = {
+                ...u,
+                ...existing
+              };
               updated = true;
             }
           }
@@ -198,12 +202,12 @@ async function startServer() {
             updated = true;
           } else {
             const existing = db.hostApplications[app.id];
-            // If the server changed state (approved/rejected), retain server status, otherwise merge
-            if (existing.status !== app.status && existing.status !== 'pending') {
-              // server takes precedence
-            } else {
-              db.hostApplications[app.id] = { ...app, ...existing };
-            }
+            // Merge safely: server status changes (e.g. approved / rejected) take precedence
+            db.hostApplications[app.id] = {
+              ...app,
+              ...existing
+            };
+            updated = true;
           }
         }
       });
@@ -219,11 +223,11 @@ async function startServer() {
             updated = true;
           } else {
             const existing = db.withdrawals[idx];
-            if (existing.status !== wd.status && existing.status !== 'pending') {
-              // server status wins
-            } else {
-              db.withdrawals[idx] = { ...wd, ...existing };
-            }
+            db.withdrawals[idx] = {
+              ...wd,
+              ...existing
+            };
+            updated = true;
           }
         }
       });
@@ -239,11 +243,11 @@ async function startServer() {
             updated = true;
           } else {
             const existing = db.transactions[idx];
-            if (existing.status !== tx.status && existing.status !== 'pending') {
-              // server wins
-            } else {
-              db.transactions[idx] = { ...tx, ...existing };
-            }
+            db.transactions[idx] = {
+              ...tx,
+              ...existing
+            };
+            updated = true;
           }
         }
       });
@@ -257,7 +261,10 @@ async function startServer() {
             db.lives[room.id] = room;
             updated = true;
           } else {
-            db.lives[room.id] = { ...room, ...db.lives[room.id] };
+            db.lives[room.id] = {
+              ...room,
+              ...db.lives[room.id]
+            };
           }
         }
       });
