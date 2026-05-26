@@ -165,6 +165,33 @@ async function startServer() {
     }
   });
 
+  // Sync users from client local storage (for ephemeral hosting recovery)
+  app.post('/api/auth/sync-users', (req, res) => {
+    const { customUsers } = req.body;
+    if (customUsers && Array.isArray(customUsers)) {
+      let updated = false;
+      customUsers.forEach((u: User) => {
+        if (u && u.id) {
+          if (!db.users[u.id]) {
+            db.users[u.id] = u;
+            updated = true;
+          } else {
+            const existing = db.users[u.id];
+            const isStandardUser = ['user_robson', 'host_lorena', 'host_thiago', 'host_babi', 'admin_contas'].includes(u.id);
+            if (!isStandardUser) {
+              db.users[u.id] = { ...existing, ...u };
+              updated = true;
+            }
+          }
+        }
+      });
+      if (updated) {
+        saveDatabase(db);
+      }
+    }
+    res.json({ success: true });
+  });
+
   // Login handler
   app.post('/api/auth/login', (req, res) => {
     const { email, password } = req.body;

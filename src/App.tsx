@@ -94,13 +94,64 @@ export default function App() {
 
   // Initialize application and fetch base user profile
   useEffect(() => {
-    fetchUserData();
-    fetchLives();
-    fetchGiftsAndPackages();
-    fetchRankings();
-    fetchAdminWhatsapp();
-    fetchSystemLogsAndApplications();
+    const initializeAndSync = async () => {
+      // Fetch custom users from local storage to handle ephemeral hosting recovery
+      const stored = localStorage.getItem('live_premium_custom_users');
+      if (stored) {
+        try {
+          const customUsers = JSON.parse(stored);
+          if (Array.isArray(customUsers) && customUsers.length > 0) {
+            // Sync with backend so the ephemeral server has them
+            await fetch('/api/auth/sync-users', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ customUsers })
+            }).catch(err => console.error("Could not sync users on mount:", err));
+          }
+        } catch (e) {
+          console.error("Error reading local custom users during boot:", e);
+        }
+      }
+      
+      // Continue normal boot loading sequence
+      fetchUserData();
+      fetchLives();
+      fetchGiftsAndPackages();
+      fetchRankings();
+      fetchAdminWhatsapp();
+      fetchSystemLogsAndApplications();
+    };
+
+    initializeAndSync();
   }, []);
+
+  // Keep local custom users cache up to date in the client's browser
+  useEffect(() => {
+    if (currentUser) {
+      localStorage.setItem('live_premium_user_id', currentUser.id);
+
+      try {
+        let customUsers: User[] = [];
+        const stored = localStorage.getItem('live_premium_custom_users');
+        if (stored) {
+          try { customUsers = JSON.parse(stored); } catch (e) {}
+        }
+        if (!Array.isArray(customUsers)) {
+          customUsers = [];
+        }
+
+        const idx = customUsers.findIndex((u) => u.id === currentUser.id);
+        if (idx !== -1) {
+          customUsers[idx] = currentUser;
+        } else {
+          customUsers.push(currentUser);
+        }
+        localStorage.setItem('live_premium_custom_users', JSON.stringify(customUsers));
+      } catch (err) {
+        console.error("Failed saving user profile to local cache:", err);
+      }
+    }
+  }, [currentUser]);
 
   // Update dynamic logs and workspace permissions when currentUser state changes (e.g., toggled roles)
   useEffect(() => {
