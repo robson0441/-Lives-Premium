@@ -1,0 +1,6 @@
+{
+  "name": "Plataforma de Lives Premium",
+  "description": "Plataforma de streaming ao vivo premium e rede social mobile-first com chat real-time, presentes animados, moedas virtuais e assinaturas VIP.",
+  "requestFramePermissions": ["camera", "microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

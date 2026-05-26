@@ -1,0 +1,345 @@
+{
+  "users": {
+    "user_robson": {
+      "id": "user_robson",
+      "username": "Robson G.",
+      "email": "robson0441@gmail.com",
+      "avatar": "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150",
+      "banner": "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800",
+      "bio": "Fã de boas lives e apoiador de streamers em ascensão! 🚀",
+      "followersCount": 15,
+      "followingCount": 32,
+      "walletCoins": 1250,
+      "level": 5,
+      "role": "admin"
+    },
+    "host_lorena": {
+      "id": "host_lorena",
+      "username": "Lorena Medeiros 🌸",
+      "email": "lorena@livepremium.com",
+      "avatar": "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150",
+      "banner": "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=800",
+      "bio": "Cantora profissional, jogadora casual e amante de bate-papo real. Vem cantar comigo! VIP semanal aberto. ✨",
+      "followersCount": 8420,
+      "followingCount": 145,
+      "walletCoins": 58900,
+      "level": 42,
+      "role": "host",
+      "pixKey": "lorena.pix@lives.com"
+    },
+    "host_thiago": {
+      "id": "host_thiago",
+      "username": "Ninja Gamer (Thiago)",
+      "email": "thiago@livepremium.com",
+      "avatar": "https://images.unsplash.com/photo-1560250097-0b93528c311a?w=150",
+      "banner": "https://images.unsplash.com/photo-1538481199705-c710c4e965fc?w=800",
+      "bio": "[Desafio Rankeado] Subindo de elo hoje com vocês! Só entra quem for VIP Gold. Envie gifts para double xp! 🎮🔥",
+      "followersCount": 12900,
+      "followingCount": 340,
+      "walletCoins": 122000,
+      "level": 55,
+      "role": "host",
+      "pixKey": "thiago.games@lives.pix"
+    },
+    "host_babi": {
+      "id": "host_babi",
+      "username": "Babi Rezende 💄",
+      "email": "babi@livepremium.com",
+      "avatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150",
+      "banner": "https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?w=800",
+      "bio": "Novidades de make, bate-papo de garota e fofocas quentes! Live privada a partir das 20h por 50 coins por minuto. 💋✨",
+      "followersCount": 22400,
+      "followingCount": 98,
+      "walletCoins": 43000,
+      "level": 71,
+      "role": "host",
+      "pixKey": "babi.beauty@epix.com.br"
+    },
+    "admin_contas": {
+      "id": "admin_contas",
+      "username": "Administrador Live",
+      "email": "admin@livepremium.com",
+      "avatar": "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150",
+      "banner": "https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=800",
+      "bio": "Painel Central de Moderação e Auditoria Financeira.",
+      "followersCount": 1,
+      "followingCount": 1,
+      "walletCoins": 999999,
+      "level": 99,
+      "role": "admin"
+    }
+  },
+  "lives": {
+    "live_lorena": {
+      "id": "live_lorena",
+      "hostId": "host_lorena",
+      "hostName": "Lorena Medeiros 🌸",
+      "hostAvatar": "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150",
+      "title": "💬 BATE-PAPO & VOZ E VIOLÃO! MPB, POP e Pedidos Especiais!",
+      "category": "Música",
+      "viewersCount": 247,
+      "isVipOnly": false,
+      "isPrivate": false,
+      "entryCoinsPrice": 0,
+      "isLive": true,
+      "thumbnail": "https://images.unsplash.com/photo-1511192336575-5a79af67a629?w=400",
+      "startedAt": "2026-05-26T16:53:40.242Z"
+    },
+    "live_thiago": {
+      "id": "live_thiago",
+      "hostId": "host_thiago",
+      "hostName": "Ninja Gamer (Thiago)",
+      "hostAvatar": "https://images.unsplash.com/photo-1560250097-0b93528c311a?w=150",
+      "title": "🏆 SÁBADO DE LIGA! SUBINDO ATÉ O TOPO DO RANKING MUNDIAL!",
+      "category": "Jogos",
+      "viewersCount": 612,
+      "isVipOnly": true,
+      "vipMinLevel": "gold",
+      "isPrivate": false,
+      "entryCoinsPrice": 0,
+      "isLive": true,
+      "thumbnail": "https://images.unsplash.com/photo-1542751371-adc38448a05e?w=400",
+      "startedAt": "2026-05-26T15:53:40.242Z"
+    },
+    "live_babi": {
+      "id": "live_babi",
+      "hostId": "host_babi",
+      "hostName": "Babi Rezende 💄",
+      "hostAvatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150",
+      "title": "🔒 SALA VIP PRIVADA: Segredos de Make & Looks de Gala!",
+      "category": "Moda & Beleza",
+      "viewersCount": 84,
+      "isVipOnly": false,
+      "isPrivate": true,
+      "entryCoinsPrice": 40,
+      "isLive": true,
+      "thumbnail": "https://images.unsplash.com/photo-1487412720507-e7ab37603c6f?w=400",
+      "startedAt": "2026-05-26T17:23:40.242Z"
+    }
+  },
+  "messages": {
+    "live_lorena": [
+      {
+        "id": "m1",
+        "username": "Lucas Santos",
+        "text": "Lorena, canta uma do Caetano Veloso por favor!",
+        "timestamp": "2026-05-26T17:48:40.242Z",
+        "isVip": false
+      },
+      {
+        "id": "m2",
+        "username": "Mariana_VIP",
+        "text": "Sua voz é maravilhosa demais, Lorena! 🌹👑",
+        "timestamp": "2026-05-26T17:49:30.242Z",
+        "isVip": true,
+        "vipType": "bronze",
+        "color": "#10b981"
+      },
+      {
+        "id": "m3",
+        "username": "Ana Julia",
+        "text": "Boa tarde galera, que live aconchegante",
+        "timestamp": "2026-05-26T17:50:20.242Z",
+        "isVip": false
+      },
+      {
+        "id": "m4",
+        "username": "Pedro Henrique",
+        "text": "Enviando rosas para empolgar a live!!",
+        "timestamp": "2026-05-26T17:51:10.242Z",
+        "isVip": false
+      }
+    ],
+    "live_thiago": [
+      {
+        "id": "m5",
+        "username": "GamerTop_99",
+        "text": "Que jogada absurda!! Esse deck é muito forte",
+        "timestamp": "2026-05-26T17:48:40.242Z",
+        "isVip": false
+      },
+      {
+        "id": "m6",
+        "username": "Kadu Alencar",
+        "text": "Double XP de gifts ativo? Vou mandar um foguete!",
+        "timestamp": "2026-05-26T17:49:00.242Z",
+        "isVip": true,
+        "vipType": "gold",
+        "color": "#f59e0b"
+      },
+      {
+        "id": "m7",
+        "username": "Ninja Gamer (Thiago)",
+        "text": "Bora subir galera! Valeu pelo apoio de todos!",
+        "timestamp": "2026-05-26T17:49:40.242Z",
+        "isVip": false
+      }
+    ],
+    "live_babi": [
+      {
+        "id": "m8",
+        "username": "Clara Sposito",
+        "text": "Menina, ameii esse batom! Qual a marca?",
+        "timestamp": "2026-05-26T17:51:40.242Z",
+        "isVip": false
+      },
+      {
+        "id": "m9",
+        "username": "Gaby Fashion",
+        "text": "Essa sala VIP tá muito top, só as novidades.",
+        "timestamp": "2026-05-26T17:52:40.242Z",
+        "isVip": true,
+        "vipType": "diamond",
+        "color": "#3b82f6"
+      }
+    ]
+  },
+  "hostApplications": {
+    "app_fernando": {
+      "id": "app_fernando",
+      "userId": "user_fernando",
+      "username": "Fernando DJs",
+      "fullName": "Fernando Albuquerque de Melo",
+      "documentNumber": "123.456.789-00",
+      "selfieUrl": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150",
+      "pixKey": "fernando.djs@gmail.pix",
+      "bio": "Faço transmissões ao vivo de sets de House e Eletro na praia de Copacabana! Quero muito entrar pra plataforma!",
+      "socialMedia": "@fernandodjs_insta",
+      "status": "pending",
+      "date": "2026-05-24T17:53:40.242Z"
+    }
+  },
+  "transactions": [
+    {
+      "id": "tx_1",
+      "userId": "user_robson",
+      "username": "Robson G.",
+      "amountBRL": 34.9,
+      "coins": 1000,
+      "type": "deposit",
+      "status": "completed",
+      "date": "2026-05-25T17:53:40.242Z"
+    },
+    {
+      "id": "tx_2",
+      "userId": "user_robson",
+      "username": "Robson G.",
+      "amountBRL": 0,
+      "coins": 5,
+      "type": "gift_send",
+      "status": "completed",
+      "date": "2026-05-26T15:53:40.242Z"
+    }
+  ],
+  "withdrawals": [
+    {
+      "id": "wd_1",
+      "userId": "host_lorena",
+      "username": "Lorena Medeiros 🌸",
+      "pixKey": "lorena.pix@lives.com",
+      "amountCoins": 20000,
+      "amountBRL": 400,
+      "status": "approved",
+      "date": "2026-05-24T17:53:40.242Z"
+    },
+    {
+      "id": "wd_2",
+      "userId": "host_thiago",
+      "username": "Ninja Gamer (Thiago)",
+      "pixKey": "thiago.games@lives.pix",
+      "amountCoins": 50000,
+      "amountBRL": 1000,
+      "status": "pending",
+      "date": "2026-05-26T14:53:40.242Z"
+    }
+  ],
+  "subscriptions": [
+    {
+      "id": "sub_1",
+      "userId": "user_robson",
+      "hostId": "host_thiago",
+      "hostName": "Ninja Gamer (Thiago)",
+      "type": "gold",
+      "priceCoins": 150,
+      "expiresAt": "2026-06-15T17:53:40.242Z",
+      "active": true
+    }
+  ],
+  "packages": [
+    {
+      "id": "coin_100",
+      "coins": 100,
+      "priceBRL": 4.9,
+      "label": "Pacote Bronze - Iniciante"
+    },
+    {
+      "id": "coin_500",
+      "coins": 500,
+      "priceBRL": 19.9,
+      "label": "Pacote Prata - Estrela"
+    },
+    {
+      "id": "coin_1000",
+      "coins": 1000,
+      "priceBRL": 34.9,
+      "label": "Pacote Gold - Influenciador"
+    },
+    {
+      "id": "coin_5000",
+      "coins": 5000,
+      "priceBRL": 149.9,
+      "label": "Pacote VIP - Realeza"
+    }
+  ],
+  "gifts": [
+    {
+      "id": "gift_rose",
+      "name": "Rosa",
+      "emoji": "🌹",
+      "coinsValue": 1,
+      "animationType": "floating",
+      "rarity": "common"
+    },
+    {
+      "id": "gift_heart",
+      "name": "Coração",
+      "emoji": "❤️",
+      "coinsValue": 5,
+      "animationType": "bounce",
+      "rarity": "common"
+    },
+    {
+      "id": "gift_fire",
+      "name": "Fogo",
+      "emoji": "🔥",
+      "coinsValue": 25,
+      "animationType": "sparkle",
+      "rarity": "rare"
+    },
+    {
+      "id": "gift_gem",
+      "name": "Diamante",
+      "emoji": "💎",
+      "coinsValue": 100,
+      "animationType": "explosion",
+      "rarity": "epic"
+    },
+    {
+      "id": "gift_crown",
+      "name": "Coroa",
+      "emoji": "👑",
+      "coinsValue": 500,
+      "animationType": "sparkle",
+      "rarity": "legendary"
+    },
+    {
+      "id": "gift_rocket",
+      "name": "Foguete",
+      "emoji": "🚀",
+      "coinsValue": 1000,
+      "animationType": "rocket",
+      "rarity": "legendary"
+    }
+  ],
+  "whatsappNumber": "5521999999999"
+}

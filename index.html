@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <title>Live Premium - Lives & Interação VIP</title>
+    
+    <!-- Meta tags do PWA -->
+    <meta name="description" content="Plataforma de streaming ao vivo premium e rede social mobile-first com chat real-time, presentes animados, moedas virtuais e assinaturas VIP." />
+    <meta name="theme-color" content="#09090b" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Live Premium" />
+    
+    <!-- Links de ícone e manifesto -->
+    <link rel="manifest" href="/manifest.json" />
+    <link rel="apple-touch-icon" href="/pwa-icon-192.png" />
+    <link rel="icon" type="image/png" href="/pwa-icon-96.png" />
+
+    <!-- Estilo rápido para evitar flics de zoom no mobile e suporte notch -->
+    <style>
+      body {
+        overscroll-behavior-y: contain; /* Bloqueia o "pull-to-refresh" indesejado */
+        -webkit-tap-highlight-color: transparent;
+      }
+    </style>
+  </head>
+  <body class="bg-zinc-950 text-white">
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+
+    <!-- Registro automático de Service Worker para PWA -->
+    <script>
+      if ('serviceWorker' in navigator) {
+        const isDev = window.location.hostname.includes('ais-dev-') || 
+                      window.location.hostname === 'localhost' || 
+                      window.location.hostname === '127.0.0.1';
+        
+        if (isDev) {
+          console.log('Ambiente de desenvolvimento detectado. Removendo qualquer Service Worker antigo...');
+          navigator.serviceWorker.getRegistrations().then(function(registrations) {
+            if (registrations.length > 0) {
+              for (let registration of registrations) {
+                registration.unregister().then(() => {
+                  console.log('Service Worker antigo desregistrado com sucesso!');
+                });
+              }
+              // Limpando caches do navegador para garantir atualização imediata do código Vite
+              if ('caches' in window) {
+                caches.keys().then(function(names) {
+                  for (let name of names) {
+                    caches.delete(name);
+                    console.log('Cache removido:', name);
+                  }
+                });
+              }
+              // Forçar um recarregamento para liberar a rede de forma limpa
+              setTimeout(() => {
+                window.location.reload();
+              }, 300);
+            }
+          });
+        } else {
+          // Apenas registra em produção real (ais-pre-...)
+          window.addEventListener('load', () => {
+            navigator.serviceWorker.register('/service-worker.js')
+              .then((reg) => {
+                console.log('Service Worker instalado com sucesso no escopo:', reg.scope);
+                
+                // Nova versão encontrada - Carrega silenciosamente em segundo plano, será ativada no próximo reinício
+                reg.onupdatefound = () => {
+                  const installingWorker = reg.installing;
+                  if (installingWorker) {
+                    installingWorker.onstatechange = () => {
+                      if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                        console.log('Nova versão premium carregada em cache. Reinicie o aplicativo para aplicar!');
+                      }
+                    };
+                  }
+                };
+              })
+              .catch((err) => {
+                console.error('Falha ao registrar Service Worker:', err);
+              });
+          });
+        }
+      }
+    </script>
+  </body>
+</html>
+
