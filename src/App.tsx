@@ -12,7 +12,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { 
   Tv, Flame, TrendingUp, Sparkles, Coins, MessageSquare, Gift, Crown, 
   DollarSign, Users, Settings, Shield, Check, X, Plus, Play, Square, 
-  Radio, Video, Smartphone, QrCode, Copy, ArrowUpRight, Lock, Unlock, 
+  Radio, Video, VideoOff, Mic, MicOff, Smartphone, QrCode, Copy, ArrowUpRight, Lock, Unlock, 
   Volume2, VolumeX, Award, Heart, HelpCircle, Send, AlertCircle, ChevronRight, UserMinus, LogOut
 } from 'lucide-react';
 import { User, LiveRoom, ChatMessage, HostApplication, CoinPackage, Transaction, Gift as GiftType, Withdrawal, UserSubscription } from './types';
@@ -43,6 +43,14 @@ export default function App() {
   const [isCopyingCode, setIsCopyingCode] = useState(false);
   const [floatingGifts, setFloatingGifts] = useState<Array<{ id: string; emoji: string; name: string; username: string; size: number; x: number; y: number }>>([]);
   const [streamMuted, setStreamMuted] = useState(false);
+
+  // Camera & Video Media Streams for real live broadcasts
+  const [localMediaStream, setLocalMediaStream] = useState<MediaStream | null>(null);
+  const [cameraActive, setCameraActive] = useState(true);
+  const [micActive, setMicActive] = useState(true);
+  const [streamFilter, setStreamFilter] = useState<'normal' | 'beauty' | 'sepia' | 'vintage' | 'neon'>('normal');
+  const [viewerReactionActive, setViewerReactionActive] = useState(false);
+  const [viewerMediaStream, setViewerMediaStream] = useState<MediaStream | null>(null);
 
   // Economy & Gift collections
   const [coinPackages, setCoinPackages] = useState<CoinPackage[]>([]);
@@ -236,6 +244,144 @@ export default function App() {
       }
     };
   }, [activeRoom]);
+
+  // Webcam & Audio Stream reference helpers
+  const activeStreamRef = useRef<MediaStream | null>(null);
+  const activeViewerStreamRef = useRef<MediaStream | null>(null);
+
+  // Manage Media Streams (Webcam & Microphone) automatically when activeRoom changes
+  useEffect(() => {
+    let cancel = false;
+    
+    const startStreaming = async () => {
+      // If currently host of the live room, trigger camera access automatically
+      if (activeRoom && currentUser && activeRoom.hostId === currentUser.id) {
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({
+            video: {
+              width: { ideal: 1280 },
+              height: { ideal: 720 },
+              facingMode: "user"
+            },
+            audio: true
+          });
+          
+          if (cancel) {
+            stream.getTracks().forEach(t => t.stop());
+            return;
+          }
+          
+          setLocalMediaStream(stream);
+          activeStreamRef.current = stream;
+          setCameraActive(true);
+          setMicActive(true);
+          addNotification("Câmera e microfone de transmissão ativados ao vivo com sucesso! 🔴✨", "success");
+        } catch (err: any) {
+          console.error("Camera access failed:", err);
+          addNotification("Acesso à câmera recusado ou indisponível. Continuando com simulador retro.", "alert");
+        }
+      }
+    };
+
+    startStreaming();
+
+    return () => {
+      cancel = true;
+      if (activeStreamRef.current) {
+        activeStreamRef.current.getTracks().forEach(track => track.stop());
+        activeStreamRef.current = null;
+      }
+      setLocalMediaStream(null);
+    };
+  }, [activeRoom?.id, currentUser?.id]);
+
+  // Handle Fan/Viewer reaction camera stream activation
+  useEffect(() => {
+    let cancel = false;
+    const handleViewerStream = async () => {
+      if (activeRoom && viewerReactionActive) {
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({
+            video: { width: 320, height: 240, facingMode: "user" },
+            audio: false // mute reaction stream audio to prevent echo feedbacks
+          });
+          if (cancel) {
+            stream.getTracks().forEach(t => t.stop());
+            return;
+          }
+          setViewerMediaStream(stream);
+          activeViewerStreamRef.current = stream;
+          addNotification("Sua Câmera de Reação de Fã está ativa no canto da live!", "success");
+        } catch (e) {
+          console.error("Fan reaction camera failed:", e);
+          setViewerReactionActive(false);
+          addNotification("Erro: Câmera de reação indisponível.", "alert");
+        }
+      } else {
+        if (activeViewerStreamRef.current) {
+          activeViewerStreamRef.current.getTracks().forEach(t => t.stop());
+          activeViewerStreamRef.current = null;
+        }
+        setViewerMediaStream(null);
+      }
+    };
+
+    handleViewerStream();
+
+    return () => {
+      cancel = true;
+      if (activeViewerStreamRef.current) {
+        activeViewerStreamRef.current.getTracks().forEach(t => t.stop());
+        activeViewerStreamRef.current = null;
+      }
+      setViewerMediaStream(null);
+    };
+  }, [activeRoom?.id, viewerReactionActive]);
+
+  // Toggle Video track dynamic operations
+  const toggleCameraTrack = () => {
+    if (activeStreamRef.current) {
+      const videoTracks = activeStreamRef.current.getVideoTracks();
+      if (videoTracks.length > 0) {
+        const nextState = !cameraActive;
+        videoTracks.forEach(track => {
+          track.enabled = nextState;
+        });
+        setCameraActive(nextState);
+        addNotification(nextState ? "Câmera de Transmissão Ativada!" : "Câmera de Transmissão Ocultada!", "info");
+      }
+    }
+  };
+
+  // Toggle Audio track dynamic operations
+  const toggleMicTrack = () => {
+    if (activeStreamRef.current) {
+      const audioTracks = activeStreamRef.current.getAudioTracks();
+      if (audioTracks.length > 0) {
+        const nextState = !micActive;
+        audioTracks.forEach(track => {
+          track.enabled = nextState;
+        });
+        setMicActive(nextState);
+        addNotification(nextState ? "Áudio do Microfone Ativo!" : "Áudio do Microfone Mutado!", "info");
+      }
+    }
+  };
+
+  const getFilterStyle = (filter: 'normal' | 'beauty' | 'sepia' | 'vintage' | 'neon') => {
+    switch (filter) {
+      case 'beauty':
+        return 'brightness(1.1) contrast(1.05) saturate(1.15) contrast(1.02) blur(0.2px)';
+      case 'sepia':
+        return 'sepia(0.85) contrast(1.15) saturate(1.1)';
+      case 'vintage':
+        return 'grayscale(1) contrast(1.3) brightness(0.9)';
+      case 'neon':
+        return 'hue-rotate(140deg) saturate(2.5) contrast(1.15)';
+      default:
+        return 'none';
+    }
+  };
 
   // Scroll to bottom on chats without scrolling body or causing viewport jumps
   useEffect(() => {
@@ -1225,64 +1371,100 @@ export default function App() {
             {/* Live Video Simulation Area */}
             <div className="aspect-video md:aspect-auto md:h-[650px] bg-black relative overflow-hidden flex items-center justify-center">
               
-              {/* Premium Simulated HLS Video Stream backdrop using absolute noise generators */}
+              {/* Real camera video streaming container or premium simulated backup fallback */}
               <div className="absolute inset-0 z-0 bg-zinc-950 flex items-center justify-center">
-                <div className={`absolute inset-0 bg-gradient-to-tr transition-all duration-1000 ${
-                  activeRoom.category === 'Jogos' ? 'from-purple-950/80 via-zinc-900 to-indigo-950/80 animate-pulse' :
-                  activeRoom.category === 'Música' ? 'from-indigo-900/40 via-zinc-950 to-teal-900/40' :
-                  'from-zinc-900 via-zinc-950 to-zinc-900'
-                }`} />
-
-                {/* Highly immersive digital equalizer/vector waves to simulate motion camera */}
-                <div className="z-10 flex flex-col items-center gap-1.5 md:gap-4 text-center p-3 md:p-8 rounded-2xl md:rounded-3xl border border-white/5 backdrop-blur-md max-w-[200px] md:max-w-sm">
-                  {/* Floating rotating disk to symbolize audio tracking */}
-                  <div className="relative">
-                    <img 
-                      src={activeRoom.hostAvatar} 
-                      alt="Avatar Streamer" 
-                      className={`w-14 h-14 md:w-28 md:h-28 rounded-full border-4 object-cover shadow-[0_0_40px_rgba(139,92,246,0.3)] ${
-                        !streamMuted ? 'animate-[spin_12s_linear_infinite]' : ''
-                      } ${
-                        activeRoom.category === 'Jogos' ? 'border-violet-500' :
-                        activeRoom.category === 'Música' ? 'border-emerald-500' :
-                        'border-pink-500'
-                      }`}
+                {activeRoom.hostId === currentUser?.id && localMediaStream && cameraActive ? (
+                  <div className="absolute inset-0 w-full h-full overflow-hidden">
+                    <video
+                      ref={(el) => {
+                        if (el) {
+                          try {
+                            if (el.srcObject !== localMediaStream) {
+                              el.srcObject = localMediaStream;
+                            }
+                          } catch (e) {
+                            console.error(e);
+                          }
+                        }
+                      }}
+                      autoPlay
+                      playsInline
+                      muted
+                      style={{ filter: getFilterStyle(streamFilter) }}
+                      className="w-full h-full object-cover"
                     />
-                    <div className="absolute top-0 right-0 w-5 h-5 md:w-8 md:h-8 rounded-full bg-emerald-500 border-2 md:border-4 border-black flex items-center justify-center animate-bounce">
-                      <span className="text-[10px] md:text-[14px]">🎙️</span>
+                    {/* Live overlay banner specifically for webcam */}
+                    <div className="absolute bottom-20 left-4 bg-zinc-950/85 backdrop-blur-sm border border-zinc-800 px-3 py-1.5 rounded-xl text-[10px] text-zinc-300 font-mono flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+                      <span>WEBCAM TRANSMISSORA ATIVA ({streamFilter.toUpperCase()})</span>
                     </div>
                   </div>
+                ) : (
+                  <>
+                    <div className={`absolute inset-0 bg-gradient-to-tr transition-all duration-1000 ${
+                      activeRoom.category === 'Jogos' ? 'from-purple-950/80 via-zinc-900 to-indigo-950/80 animate-pulse' :
+                      activeRoom.category === 'Música' ? 'from-indigo-900/40 via-zinc-950 to-teal-900/40' :
+                      'from-zinc-900 via-zinc-950 to-zinc-900'
+                    }`} />
 
-                  <div>
-                    <span className="px-1.5 py-0.5 md:px-2.5 md:py-0.5 rounded-full text-[8px] md:text-[10px] font-bold uppercase tracking-wider bg-red-600 text-white animate-pulse inline-flex items-center gap-1">
-                      <Radio className="w-2.5 h-2.5 md:w-3 md:h-3 text-white shrink-0" /> TRANSMISSÃO HLS ATIVA
-                    </span>
-                    <h3 className="font-bold text-white text-[11px] md:text-base mt-1 md:mt-2 line-clamp-1 md:line-clamp-2 leading-snug">{activeRoom.title}</h3>
-                    <p className="text-[9px] md:text-xs text-zinc-400 mt-0.5 md:mt-1">Host: <span className="text-zinc-200 font-semibold">{activeRoom.hostName}</span></p>
-                  </div>
+                    {/* Highly immersive digital equalizer/vector waves to simulate motion camera */}
+                    <div className="z-10 flex flex-col items-center gap-1.5 md:gap-4 text-center p-3 md:p-8 rounded-2xl md:rounded-3xl border border-white/5 backdrop-blur-md max-w-[200px] md:max-w-sm">
+                      {/* Floating rotating disk to symbolize audio tracking */}
+                      <div className="relative">
+                        <img 
+                          src={activeRoom.hostAvatar} 
+                          alt="Avatar Streamer" 
+                          className={`w-14 h-14 md:w-28 md:h-28 rounded-full border-4 object-cover shadow-[0_0_40px_rgba(139,92,246,0.3)] ${
+                            !streamMuted ? 'animate-[spin_12s_linear_infinite]' : ''
+                          } ${
+                            activeRoom.category === 'Jogos' ? 'border-violet-500' :
+                            activeRoom.category === 'Música' ? 'border-emerald-500' :
+                            'border-pink-500'
+                          }`}
+                        />
+                        <div className="absolute top-0 right-0 w-5 h-5 md:w-8 md:h-8 rounded-full bg-emerald-500 border-2 md:border-4 border-black flex items-center justify-center animate-bounce">
+                          <span className="text-[10px] md:text-[14px]">🎙️</span>
+                        </div>
+                      </div>
 
-                  {/* Micro simulated camera metadata lines */}
-                  <div className="w-full hidden md:flex items-center justify-between text-[10px] font-mono text-zinc-500 border-t border-zinc-800/80 pt-3">
-                    <span>FPS: 60 • H.264</span>
-                    <span>DELAY: 1.2s</span>
-                    <span>1080p60</span>
-                  </div>
-                </div>
+                      <div>
+                        <span className="px-1.5 py-0.5 md:px-2.5 md:py-0.5 rounded-full text-[8px] md:text-[10px] font-bold uppercase tracking-wider bg-red-600 text-white animate-pulse inline-flex items-center gap-1">
+                          <Radio className="w-2.5 h-2.5 md:w-3 md:h-3 text-white shrink-0" /> {activeRoom.hostId === currentUser?.id ? "TRANSMISSÃO AO VIVO" : "TRANSMISSÃO HLS ATIVA"}
+                        </span>
+                        <h3 className="font-bold text-white text-[11px] md:text-base mt-1 md:mt-2 line-clamp-1 md:line-clamp-2 leading-snug">{activeRoom.title}</h3>
+                        <p className="text-[9px] md:text-xs text-zinc-400 mt-0.5 md:mt-1">
+                          {activeRoom.hostId === currentUser?.id && !cameraActive ? (
+                            <span className="text-yellow-400 font-bold">⚠️ Câmera do Transmissor Desativada</span>
+                          ) : (
+                            <>Host: <span className="text-zinc-200 font-semibold">{activeRoom.hostName}</span></>
+                          )}
+                        </p>
+                      </div>
 
-                {/* Animated Visualizer canvas-lines mimicking gameplay or music dynamic signals */}
-                {!streamMuted && (
-                  <div className="absolute bottom-16 left-0 right-0 h-24 flex items-end justify-between px-10 gap-[2px] opacity-25 pointer-events-none">
-                    {Array.from({ length: 42 }).map((_, i) => (
-                      <div 
-                        key={i} 
-                        className="w-1 bg-gradient-to-t from-violet-600 to-emerald-400 rounded-full animate-pulse"
-                        style={{ 
-                          height: `${15 + Math.random() * 85}%`, 
-                          animationDuration: `${300 + Math.random() * 800}ms` 
-                        }}
-                      />
-                    ))}
-                  </div>
+                      {/* Micro simulated camera metadata lines */}
+                      <div className="w-full hidden md:flex items-center justify-between text-[10px] font-mono text-zinc-500 border-t border-zinc-800/80 pt-3">
+                        <span>FPS: 60 • H.264</span>
+                        <span>DELAY: {activeRoom.hostId === currentUser?.id ? "0.0s" : "1.2s"}</span>
+                        <span>1080p60</span>
+                      </div>
+                    </div>
+
+                    {/* Animated Visualizer canvas-lines mimicking gameplay or music dynamic signals */}
+                    {!streamMuted && (
+                      <div className="absolute bottom-16 left-0 right-0 h-24 flex items-end justify-between px-10 gap-[2px] opacity-25 pointer-events-none">
+                        {Array.from({ length: 42 }).map((_, i) => (
+                          <div 
+                            key={i} 
+                            className="w-1 bg-gradient-to-t from-violet-600 to-emerald-400 rounded-full animate-pulse"
+                            style={{ 
+                              height: `${15 + Math.random() * 85}%`, 
+                              animationDuration: `${300 + Math.random() * 800}ms` 
+                            }}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
 
@@ -1339,32 +1521,121 @@ export default function App() {
                 </button>
               </div>
 
+              {/* Picture in Picture (PiP) Viewer Live Reaction stream */}
+              {viewerReactionActive && viewerMediaStream && (
+                <div className="absolute right-4 top-16 z-40 w-28 md:w-40 aspect-video rounded-2xl border-2 border-violet-500 shadow-[0_0_20px_rgba(139,92,246,0.5)] overflow-hidden bg-zinc-950 flex flex-col justify-between">
+                  <video
+                    ref={(el) => {
+                      if (el) {
+                        try {
+                          if (el.srcObject !== viewerMediaStream) {
+                            el.srcObject = viewerMediaStream;
+                          }
+                        } catch (e) {}
+                      }
+                    }}
+                    autoPlay
+                    playsInline
+                    muted
+                    className="absolute inset-0 w-full h-full object-cover z-0"
+                  />
+                  <div className="absolute top-1 left-1 z-10 flex items-center gap-1 bg-black/80 px-1 py-0.5 rounded text-[8px] font-bold text-white uppercase tracking-wider">
+                    <span className="w-1.5 h-1.5 bg-purple-500 rounded-full animate-ping" /> REAÇÃO AO VIVO
+                  </div>
+                  <button
+                    onClick={() => setViewerReactionActive(false)}
+                    className="absolute top-1 right-1 z-10 w-4 h-4 rounded-full bg-black/80 hover:bg-zinc-900 text-white flex items-center justify-center text-[8px] border border-white/20 cursor-pointer"
+                  >
+                    ✕
+                  </button>
+                </div>
+              )}
+
               {/* Bottom control bar overlay */}
-              <div className="absolute bottom-2 left-2 right-2 md:bottom-4 md:left-4 md:right-4 z-30 flex items-center justify-between bg-zinc-950/85 backdrop-blur-md border border-zinc-800/60 p-1.5 md:p-2.5 rounded-xl md:rounded-2xl">
-                <div className="flex items-center gap-1.5 md:gap-2">
+              <div className="absolute bottom-2 left-2 right-2 md:bottom-4 md:left-4 md:right-4 z-35 flex items-center justify-between bg-zinc-950/90 backdrop-blur-md border border-zinc-800/80 p-1.5 md:p-3 rounded-xl md:rounded-2xl shadow-xl">
+                <div className="flex items-center gap-1.5 md:gap-2 max-w-[40%]">
                   <img 
                     src={activeRoom.hostAvatar} 
                     alt={activeRoom.hostName} 
-                    className="w-7 h-7 md:w-9 md:h-9 rounded-full border border-violet-500 object-cover" 
+                    className="w-7 h-7 md:w-10 md:h-10 rounded-full border-2 border-violet-550 object-cover shrink-0" 
                   />
-                  <div>
-                    <p className="font-bold text-[10px] md:text-xs text-white leading-tight">{activeRoom.hostName}</p>
-                    <span className="text-[8px] md:text-[10px] text-emerald-400 font-medium block">Categoria: {activeRoom.category}</span>
+                  <div className="truncate">
+                    <p className="font-bold text-[10px] md:text-sm text-white leading-tight truncate">{activeRoom.hostName}</p>
+                    <span className="text-[8px] md:text-[10px] text-emerald-450 font-bold block">Categoria: {activeRoom.category}</span>
                   </div>
                 </div>
 
+                {/* Main Dynamic Video Broadcast and Custom Interaction Controls */}
                 <div className="flex items-center gap-1 md:gap-1.5">
+                  {activeRoom.hostId === currentUser?.id ? (
+                    <>
+                      {/* Host Controls for camera, mic and filter selection */}
+                      <button
+                        onClick={toggleCameraTrack}
+                        className={`w-7 h-7 md:w-9 md:h-9 rounded-lg md:rounded-xl flex items-center justify-center transition-colors cursor-pointer ${
+                          cameraActive ? 'bg-zinc-900 hover:bg-zinc-800 text-emerald-400' : 'bg-red-950/80 hover:bg-red-900 border border-red-800/40 text-red-400'
+                        }`}
+                        title={cameraActive ? "Desativar Câmera" : "Ativar Câmera"}
+                      >
+                        {cameraActive ? <Video className="w-3.5 h-3.5 md:w-4 md:h-4" /> : <VideoOff className="w-3.5 h-3.5 md:w-4 md:h-4" />}
+                      </button>
+
+                      <button
+                        onClick={toggleMicTrack}
+                        className={`w-7 h-7 md:w-9 md:h-9 rounded-lg md:rounded-xl flex items-center justify-center transition-colors cursor-pointer ${
+                          micActive ? 'bg-zinc-900 hover:bg-zinc-800 text-emerald-400' : 'bg-red-950/80 hover:bg-red-900 border border-red-800/40 text-red-400'
+                        }`}
+                        title={micActive ? "Mutar Microfone" : "Ativar Microfone"}
+                      >
+                        {micActive ? <Mic className="w-3.5 h-3.5 md:w-4 md:h-4" /> : <MicOff className="w-3.5 h-3.5 md:w-4 md:h-4" />}
+                      </button>
+
+                      {cameraActive && (
+                        <button
+                          onClick={() => {
+                            const filters: Array<'normal' | 'beauty' | 'sepia' | 'vintage' | 'neon'> = ['normal', 'beauty', 'sepia', 'vintage', 'neon'];
+                            const idx = filters.indexOf(streamFilter);
+                            const nextIdx = (idx + 1) % filters.length;
+                            setStreamFilter(filters[nextIdx]);
+                            addNotification(`Filtro Alterado: ${filters[nextIdx].toUpperCase()}`, "success");
+                          }}
+                          className="bg-violet-900 hover:bg-violet-850 border border-violet-750 text-violet-200 w-7 h-7 md:w-9 md:h-9 rounded-lg md:rounded-xl flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                          title="Alternar filtro estético"
+                        >
+                          <Sparkles className="w-3.5 h-3.5 md:w-4 md:h-4 text-violet-300 animate-pulse" />
+                        </button>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      {/* Viewer Reaction camera button */}
+                      <button
+                        onClick={() => setViewerReactionActive(!viewerReactionActive)}
+                        className={`w-7 h-7 md:w-9 md:h-9 rounded-lg md:rounded-xl flex items-center justify-center transition-colors border cursor-pointer ${
+                          viewerReactionActive 
+                            ? 'bg-purple-600 border-purple-500 text-white animate-pulse' 
+                            : 'bg-zinc-900 border-zinc-800 hover:bg-zinc-800 text-zinc-300'
+                        }`}
+                        title={viewerReactionActive ? "Desativar Câmera de Reação" : "Reagir com minha Webcam ao Vivo"}
+                      >
+                        <Video className="w-3.5 h-3.5 md:w-4 md:h-4" />
+                      </button>
+                    </>
+                  )}
+
                   <button
                     onClick={() => setStreamMuted(!streamMuted)}
-                    className="w-7 h-7 md:w-8 md:h-8 rounded-lg md:rounded-xl bg-zinc-900 hover:bg-zinc-800 flex items-center justify-center text-zinc-300 transition-colors cursor-pointer"
+                    className="w-7 h-7 md:w-9 md:h-9 rounded-lg md:rounded-xl bg-zinc-900 hover:bg-zinc-800 flex items-center justify-center text-zinc-300 transition-colors cursor-pointer"
+                    title={streamMuted ? "Tirar do Mudo" : "Mutar Áudio da Stream"}
                   >
-                    {streamMuted ? <VolumeX className="w-3.5 h-3.5 text-red-400" /> : <Volume2 className="w-3.5 h-3.5 text-emerald-400" />}
+                    {streamMuted ? <VolumeX className="w-3.5 h-3.5 md:w-4 md:h-4 text-red-400" /> : <Volume2 className="w-3.5 h-3.5 md:w-4 md:h-4 text-emerald-400" />}
                   </button>
+
                   <button
                     onClick={() => setShowVipModal(true)}
-                    className="flex items-center gap-1 bg-gradient-to-r from-amber-500 to-yellow-400 hover:from-amber-600 hover:to-yellow-500 text-zinc-950 font-black text-[9px] md:text-[11px] px-2 py-1.5 md:px-3 md:py-2 rounded-lg md:rounded-xl transition-all font-sans tracking-wide uppercase hover:shadow-[0_0_15px_rgba(245,158,11,0.4)] cursor-pointer"
+                    className="flex items-center gap-1 bg-gradient-to-r from-amber-500 to-yellow-400 hover:from-amber-600 hover:to-yellow-550 text-zinc-950 font-black text-[9px] md:text-xs px-2.5 py-1.5 md:px-4 md:py-2 rounded-lg md:rounded-xl transition-all font-sans tracking-wide uppercase hover:shadow-[0_0_15px_rgba(245,158,11,0.4)] cursor-pointer"
                   >
-                    <Crown className="w-3 h-3 md:w-3.5 md:h-3.5 fill-zinc-950 text-zinc-950" /> Ser VIP
+                    <Crown className="w-3.5 h-3.5 fill-zinc-950 text-zinc-950 shrink-0" /> Ser VIP
                   </button>
                 </div>
               </div>
