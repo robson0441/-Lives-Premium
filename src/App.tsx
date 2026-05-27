@@ -68,19 +68,19 @@ const compressAndResizeImage = (file: File, maxWidth = 800, maxHeight = 800, qua
 const getSimulatedStreamVideo = (category?: string) => {
   const norm = category?.toLowerCase() || '';
   if (norm.includes('jogo') || norm.includes('game') || norm.includes('player')) {
-    return 'https://assets.mixkit.co/videos/preview/mixkit-playing-pc-games-with-rgb-lights-40051-large.mp4';
+    // Sintel: Great fantasy movie with dynamic visuals and background audio
+    return 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4';
   }
   if (norm.includes('mús') || norm.includes('sound') || norm.includes('music') || norm.includes('show') || norm.includes('dj')) {
-    return 'https://assets.mixkit.co/videos/preview/mixkit-hands-of-a-dj-controlling-a-sound-mixer-42861-large.mp4';
+    // Tears of Steel: Futuristic cyberpunk scene with clear voices, speech dialogue and electronic ambient music
+    return 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4';
   }
   if (norm.includes('moda') || norm.includes('beleza') || norm.includes('fashion') || norm.includes('maquiagem')) {
-    return 'https://assets.mixkit.co/videos/preview/mixkit-young-woman-streaming-online-video-with-her-phone-41584-large.mp4';
+    // Big Buck Bunny: Bright cartoon scenery with rich cartoon audio effects
+    return 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4';
   }
-  if (norm.includes('vida') || norm.includes('vlog') || norm.includes('real')) {
-    return 'https://assets.mixkit.co/videos/preview/mixkit-woman-recording-a-video-with-her-smartphone-41586-large.mp4';
-  }
-  // Default fallback stream loop (Bate-papo / Social)
-  return 'https://assets.mixkit.co/videos/preview/mixkit-woman-recording-a-video-with-her-smartphone-41586-large.mp4';
+  // Elephants Dream: Surreal 3D world with detailed characters talking and clear audio speech
+  return 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4';
 };
 
 export default function App() {
@@ -106,7 +106,7 @@ export default function App() {
   const [notifications, setNotifications] = useState<Array<{ id: string; text: string; type: 'info' | 'success' | 'alert' }>>([]);
   const [isCopyingCode, setIsCopyingCode] = useState(false);
   const [floatingGifts, setFloatingGifts] = useState<Array<{ id: string; emoji: string; name: string; username: string; size: number; x: number; y: number }>>([]);
-  const [streamMuted, setStreamMuted] = useState(false);
+  const [streamMuted, setStreamMuted] = useState(true);
 
   // Camera & Video Media Streams for real live broadcasts
   const [localMediaStream, setLocalMediaStream] = useState<MediaStream | null>(null);
@@ -1605,7 +1605,15 @@ export default function App() {
                   </div>
                 ) : (
                   <>
-                    <div className="absolute inset-0 w-full h-full overflow-hidden bg-black flex items-center justify-center">
+                    <div 
+                      onClick={() => {
+                        if (streamMuted) {
+                          setStreamMuted(false);
+                          addNotification("Áudio e vídeo da transmissão ao vivo ativados com sucesso! 🔊✨", "success");
+                        }
+                      }}
+                      className={`absolute inset-0 w-full h-full overflow-hidden bg-black flex items-center justify-center ${streamMuted ? 'cursor-pointer group' : ''}`}
+                    >
                       <video
                         src={getSimulatedStreamVideo(activeRoom.category)}
                         autoPlay
@@ -1616,32 +1624,55 @@ export default function App() {
                         poster={activeRoom.thumbnail || undefined}
                       />
                       {/* Ambient color gradient over the video to match aesthetics and keep HUD readable */}
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/35 to-black/60 pointer-events-none z-1" />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/20 to-black/40 pointer-events-none z-1" />
+
+                      {/* Interactive Tap-To-Unmute Screen Overlay */}
+                      {streamMuted && (
+                        <div className="absolute inset-0 z-10 bg-black/50 backdrop-blur-xs flex flex-col items-center justify-center p-6 text-center animate-fade-in">
+                          <div className="w-16 h-16 rounded-full bg-violet-600/90 hover:bg-violet-550 border-2 border-violet-400 flex items-center justify-center text-white shadow-[0_0_30px_rgba(139,92,246,0.65)] hover:scale-110 active:scale-95 transition-all duration-300">
+                            <VolumeX className="w-8 h-8 animate-pulse" />
+                          </div>
+                          
+                          <h3 className="text-white text-base font-black mt-4 uppercase tracking-wider select-none">
+                            🔇 Transmissão Iniciada sem Áudio
+                          </h3>
+                          <p className="text-zinc-250 text-xs mt-1.5 max-w-xs font-sans font-medium line-clamp-2 select-none">
+                            Toque em qualquer lugar da tela para <strong>ativar a câmera, voz e som real</strong> da live do host! 🎙️✨
+                          </p>
+
+                          <div className="mt-4 px-4 py-2 bg-zinc-950/90 border border-zinc-800 rounded-full flex items-center gap-2 group-hover:border-violet-500/50 transition-colors shadow-lg">
+                            <span className="flex h-2 w-2 relative">
+                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                            </span>
+                            <span className="text-[10px] font-mono font-bold text-zinc-300 uppercase tracking-widest">
+                              REPRODUÇÃO HLS 1085p ATIVA
+                            </span>
+                          </div>
+                        </div>
+                      )}
                     </div>
 
-                    {/* Mute Helper Floating Widget instruction line */}
-                    {streamMuted && (
-                      <div className="absolute top-4 left-18 z-20 bg-zinc-950/85 backdrop-blur-sm border border-zinc-800 rounded-xl py-1.5 px-3 flex items-center gap-2 shadow-xl animate-bounce">
-                        <span className="flex h-2 w-2 relative">
-                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-violet-400 opacity-75"></span>
-                          <span className="relative inline-flex rounded-full h-2 w-2 bg-violet-500"></span>
-                        </span>
-                        <span className="text-[9.5px] text-zinc-250 font-bold uppercase tracking-wider">🔇 Transmissão Mutada. Clique no alto-falante abaixo para som!</span>
+                    {/* Mute Helper Floating top widget when stream has sound activated */}
+                    {!streamMuted && (
+                      <div className="absolute top-4 left-18 z-20 bg-zinc-950/85 backdrop-blur-sm border border-zinc-800 px-3 py-1.5 rounded-xl text-[10px] text-zinc-300 font-mono flex items-center gap-2 shadow-lg animate-fade-in">
+                        <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+                        <span>🔊 MULTIMÍDIA Real ao Vivo Ativa ({activeRoom.category.toUpperCase()})</span>
                       </div>
                     )}
 
                     {/* Animated Visualizer canvas-lines mimicking gameplay or music dynamic signals */}
                     {!streamMuted && (
-                      <div className="absolute bottom-16 left-0 right-0 h-24 flex items-end justify-between px-10 gap-[2px] opacity-30 pointer-events-none z-1">
+                      <div className="absolute bottom-16 left-0 right-0 h-24 flex items-end justify-between px-10 gap-[2px] opacity-35 pointer-events-none z-1">
                         {Array.from({ length: 42 }).map((_, i) => (
-                          <div 
-                            key={i} 
-                            className="w-1 bg-gradient-to-t from-violet-600 to-emerald-400 rounded-full animate-pulse"
-                            style={{ 
-                              height: `${15 + Math.random() * 85}%`, 
-                              animationDuration: `${300 + Math.random() * 800}ms` 
-                            }}
-                          />
+                           <div 
+                             key={i} 
+                             className="w-1 bg-gradient-to-t from-violet-600 to-emerald-400 rounded-full animate-pulse"
+                             style={{ 
+                               height: `${15 + Math.random() * 85}%`, 
+                               animationDuration: `${300 + Math.random() * 800}ms` 
+                             }}
+                           />
                         ))}
                       </div>
                     )}
