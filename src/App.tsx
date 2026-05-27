@@ -64,6 +64,25 @@ const compressAndResizeImage = (file: File, maxWidth = 800, maxHeight = 800, qua
   });
 };
 
+// Category-themed public video loop presets to simulate active camera streams for viewers
+const getSimulatedStreamVideo = (category?: string) => {
+  const norm = category?.toLowerCase() || '';
+  if (norm.includes('jogo') || norm.includes('game') || norm.includes('player')) {
+    return 'https://assets.mixkit.co/videos/preview/mixkit-playing-pc-games-with-rgb-lights-40051-large.mp4';
+  }
+  if (norm.includes('mús') || norm.includes('sound') || norm.includes('music') || norm.includes('show') || norm.includes('dj')) {
+    return 'https://assets.mixkit.co/videos/preview/mixkit-hands-of-a-dj-controlling-a-sound-mixer-42861-large.mp4';
+  }
+  if (norm.includes('moda') || norm.includes('beleza') || norm.includes('fashion') || norm.includes('maquiagem')) {
+    return 'https://assets.mixkit.co/videos/preview/mixkit-young-woman-streaming-online-video-with-her-phone-41584-large.mp4';
+  }
+  if (norm.includes('vida') || norm.includes('vlog') || norm.includes('real')) {
+    return 'https://assets.mixkit.co/videos/preview/mixkit-woman-recording-a-video-with-her-smartphone-41586-large.mp4';
+  }
+  // Default fallback stream loop (Bate-papo / Social)
+  return 'https://assets.mixkit.co/videos/preview/mixkit-woman-recording-a-video-with-her-smartphone-41586-large.mp4';
+};
+
 export default function App() {
   // Authentication states
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -1586,14 +1605,22 @@ export default function App() {
                   </div>
                 ) : (
                   <>
-                    <div className={`absolute inset-0 bg-gradient-to-tr transition-all duration-1000 ${
-                      activeRoom.category === 'Jogos' ? 'from-purple-950/80 via-zinc-900 to-indigo-950/80 animate-pulse' :
-                      activeRoom.category === 'Música' ? 'from-indigo-900/40 via-zinc-950 to-teal-900/40' :
-                      'from-zinc-900 via-zinc-950 to-zinc-900'
-                    }`} />
+                    <div className="absolute inset-0 w-full h-full overflow-hidden bg-black flex items-center justify-center">
+                      <video
+                        src={getSimulatedStreamVideo(activeRoom.category)}
+                        autoPlay
+                        loop
+                        playsInline
+                        muted={streamMuted}
+                        className="w-full h-full object-cover transition-all duration-350"
+                        poster={activeRoom.thumbnail || undefined}
+                      />
+                      {/* Ambient color gradient over the video to match aesthetics and keep HUD readable */}
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/35 to-black/60 pointer-events-none z-1" />
+                    </div>
 
-                    {/* Highly immersive digital equalizer/vector waves to simulate motion camera */}
-                    <div className="z-10 flex flex-col items-center gap-1.5 md:gap-4 text-center p-3 md:p-8 rounded-2xl md:rounded-3xl border border-white/5 backdrop-blur-md max-w-[200px] md:max-w-sm">
+                    {/* HUD / Host overlay details when watching the premium simulated stream */}
+                    <div className="z-10 flex flex-col items-center gap-1.5 md:gap-4 text-center p-3 md:p-8 rounded-2xl md:rounded-3xl border border-white/5 backdrop-blur-md max-w-[200px] md:max-w-sm mr-auto ml-auto relative">
                       {/* Floating rotating disk to symbolize audio tracking */}
                       <div className="relative">
                         <img 
@@ -1613,30 +1640,37 @@ export default function App() {
                       </div>
 
                       <div>
-                        <span className="px-1.5 py-0.5 md:px-2.5 md:py-0.5 rounded-full text-[8px] md:text-[10px] font-bold uppercase tracking-wider bg-red-600 text-white animate-pulse inline-flex items-center gap-1">
-                          <Radio className="w-2.5 h-2.5 md:w-3 md:h-3 text-white shrink-0" /> {activeRoom.hostId === currentUser?.id ? "TRANSMISSÃO AO VIVO" : "TRANSMISSÃO HLS ATIVA"}
+                        <span className="px-1.5 py-0.5 md:px-2.5 md:py-0.5 rounded-full text-[8px] md:text-[10px] font-bold uppercase tracking-wider bg-red-650 text-white animate-pulse inline-flex items-center gap-1">
+                          <Radio className="w-2.5 h-2.5 md:w-3 md:h-3 text-white shrink-0" /> TRANSMISSÃO HLS ATIVA (1080p)
                         </span>
                         <h3 className="font-bold text-white text-[11px] md:text-base mt-1 md:mt-2 line-clamp-1 md:line-clamp-2 leading-snug">{activeRoom.title}</h3>
-                        <p className="text-[9px] md:text-xs text-zinc-400 mt-0.5 md:mt-1">
-                          {activeRoom.hostId === currentUser?.id && !cameraActive ? (
-                            <span className="text-yellow-400 font-bold">⚠️ Câmera do Transmissor Desativada</span>
-                          ) : (
-                            <>Host: <span className="text-zinc-200 font-semibold">{activeRoom.hostName}</span></>
-                          )}
+                        <p className="text-[9px] md:text-xs text-zinc-300 mt-0.5 md:mt-1">
+                          Host: <span className="text-violet-300 font-bold">{activeRoom.hostName}</span>
                         </p>
                       </div>
 
-                      {/* Micro simulated camera metadata lines */}
-                      <div className="w-full hidden md:flex items-center justify-between text-[10px] font-mono text-zinc-500 border-t border-zinc-800/80 pt-3">
-                        <span>FPS: 60 • H.264</span>
-                        <span>DELAY: {activeRoom.hostId === currentUser?.id ? "0.0s" : "1.2s"}</span>
-                        <span>1080p60</span>
+                      {/* Video streaming instructions or controls */}
+                      <div className="w-full hidden md:flex items-center justify-between text-[10px] font-mono text-zinc-400 border-t border-zinc-800/80 pt-3">
+                        <span>FPS: 60 • RTMP</span>
+                        <span className="text-emerald-400">LATÊNCIA: 1.2s</span>
+                        <span>1080p65</span>
                       </div>
                     </div>
 
+                    {/* Mute Helper Floating Widget instruction line */}
+                    {streamMuted && (
+                      <div className="absolute top-4 left-4 z-20 bg-zinc-950/85 backdrop-blur-sm border border-zinc-805/80 rounded-xl py-1.5 px-3 flex items-center gap-2 shadow-xl animate-bounce">
+                        <span className="flex h-2 w-2 relative">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-violet-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-2 w-2 bg-violet-500"></span>
+                        </span>
+                        <span className="text-[9.5px] text-zinc-250 font-bold uppercase tracking-wider">🔇 Transmissão Mutada. Clique no alto-falante abaixo para som!</span>
+                      </div>
+                    )}
+
                     {/* Animated Visualizer canvas-lines mimicking gameplay or music dynamic signals */}
                     {!streamMuted && (
-                      <div className="absolute bottom-16 left-0 right-0 h-24 flex items-end justify-between px-10 gap-[2px] opacity-25 pointer-events-none">
+                      <div className="absolute bottom-16 left-0 right-0 h-24 flex items-end justify-between px-10 gap-[2px] opacity-30 pointer-events-none z-1">
                         {Array.from({ length: 42 }).map((_, i) => (
                           <div 
                             key={i} 
