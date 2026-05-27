@@ -1619,47 +1619,9 @@ export default function App() {
                       <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/35 to-black/60 pointer-events-none z-1" />
                     </div>
 
-                    {/* HUD / Host overlay details when watching the premium simulated stream */}
-                    <div className="z-10 flex flex-col items-center gap-1.5 md:gap-4 text-center p-3 md:p-8 rounded-2xl md:rounded-3xl border border-white/5 backdrop-blur-md max-w-[200px] md:max-w-sm mr-auto ml-auto relative">
-                      {/* Floating rotating disk to symbolize audio tracking */}
-                      <div className="relative">
-                        <img 
-                          src={activeRoom.hostAvatar} 
-                          alt="Avatar Streamer" 
-                          className={`w-14 h-14 md:w-28 md:h-28 rounded-full border-4 object-cover shadow-[0_0_40px_rgba(139,92,246,0.3)] ${
-                            !streamMuted ? 'animate-[spin_12s_linear_infinite]' : ''
-                          } ${
-                            activeRoom.category === 'Jogos' ? 'border-violet-500' :
-                            activeRoom.category === 'Música' ? 'border-emerald-500' :
-                            'border-pink-500'
-                          }`}
-                        />
-                        <div className="absolute top-0 right-0 w-5 h-5 md:w-8 md:h-8 rounded-full bg-emerald-500 border-2 md:border-4 border-black flex items-center justify-center animate-bounce">
-                          <span className="text-[10px] md:text-[14px]">🎙️</span>
-                        </div>
-                      </div>
-
-                      <div>
-                        <span className="px-1.5 py-0.5 md:px-2.5 md:py-0.5 rounded-full text-[8px] md:text-[10px] font-bold uppercase tracking-wider bg-red-650 text-white animate-pulse inline-flex items-center gap-1">
-                          <Radio className="w-2.5 h-2.5 md:w-3 md:h-3 text-white shrink-0" /> TRANSMISSÃO HLS ATIVA (1080p)
-                        </span>
-                        <h3 className="font-bold text-white text-[11px] md:text-base mt-1 md:mt-2 line-clamp-1 md:line-clamp-2 leading-snug">{activeRoom.title}</h3>
-                        <p className="text-[9px] md:text-xs text-zinc-300 mt-0.5 md:mt-1">
-                          Host: <span className="text-violet-300 font-bold">{activeRoom.hostName}</span>
-                        </p>
-                      </div>
-
-                      {/* Video streaming instructions or controls */}
-                      <div className="w-full hidden md:flex items-center justify-between text-[10px] font-mono text-zinc-400 border-t border-zinc-800/80 pt-3">
-                        <span>FPS: 60 • RTMP</span>
-                        <span className="text-emerald-400">LATÊNCIA: 1.2s</span>
-                        <span>1080p65</span>
-                      </div>
-                    </div>
-
                     {/* Mute Helper Floating Widget instruction line */}
                     {streamMuted && (
-                      <div className="absolute top-4 left-4 z-20 bg-zinc-950/85 backdrop-blur-sm border border-zinc-805/80 rounded-xl py-1.5 px-3 flex items-center gap-2 shadow-xl animate-bounce">
+                      <div className="absolute top-4 left-18 z-20 bg-zinc-950/85 backdrop-blur-sm border border-zinc-800 rounded-xl py-1.5 px-3 flex items-center gap-2 shadow-xl animate-bounce">
                         <span className="flex h-2 w-2 relative">
                           <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-violet-400 opacity-75"></span>
                           <span className="relative inline-flex rounded-full h-2 w-2 bg-violet-500"></span>
