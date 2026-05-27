@@ -245,6 +245,24 @@ export default function App() {
     };
   }, [activeRoom]);
 
+  // Keep the lives list dynamically updated (every 4 seconds) to ensure started transmissions show up instantly
+  // Also softly sync the current user's profile state to reflect approval status instantly (every 12 seconds)
+  useEffect(() => {
+    let userFetchCounter = 0;
+    const listPoller = setInterval(() => {
+      fetchLives();
+      
+      userFetchCounter += 4;
+      if (userFetchCounter >= 12 && currentUser) {
+        fetchUserData();
+        userFetchCounter = 0;
+      }
+    }, 4000);
+    return () => {
+      clearInterval(listPoller);
+    };
+  }, [activeRoom, currentUser?.id]);
+
   // Webcam & Audio Stream reference helpers
   const activeStreamRef = useRef<MediaStream | null>(null);
   const activeViewerStreamRef = useRef<MediaStream | null>(null);
@@ -985,6 +1003,9 @@ export default function App() {
       if (res.ok) {
         const bodyValue = await res.json();
         addNotification("Sua transmissão foi iniciada com SRS rtmp/hls! Seus seguidores foram notificados! 🔴✨", "success");
+        if (bodyValue.live) {
+          await syncAllCollections({ customLives: [bodyValue.live] });
+        }
         fetchLives();
         setActiveRoom(bodyValue.live); // Enter player view to view own live chat!
       } else {
@@ -1003,7 +1024,10 @@ export default function App() {
         method: 'POST'
       });
       if (res.ok) {
+        const bodyValue = await res.json();
         addNotification("A transmissão ao vivo foi encerrada.", "info");
+        const endedLive = bodyValue.live || { id: roomId, isLive: false };
+        await syncAllCollections({ customLives: [endedLive] });
         fetchLives();
         if (activeRoom?.id === roomId) {
           setActiveRoom(null);
