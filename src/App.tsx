@@ -13,11 +13,56 @@ import {
   Tv, Flame, TrendingUp, Sparkles, Coins, MessageSquare, Gift, Crown, 
   DollarSign, Users, Settings, Shield, Check, X, Plus, Play, Square, 
   Radio, Video, VideoOff, Mic, MicOff, Smartphone, QrCode, Copy, ArrowUpRight, Lock, Unlock, 
-  Volume2, VolumeX, Award, Heart, HelpCircle, Send, AlertCircle, ChevronRight, UserMinus, LogOut, Camera
+  Volume2, VolumeX, Award, Heart, HelpCircle, Send, AlertCircle, ChevronRight, UserMinus, LogOut, Camera, Upload
 } from 'lucide-react';
 import { User, LiveRoom, ChatMessage, HostApplication, CoinPackage, Transaction, Gift as GiftType, Withdrawal, UserSubscription } from './types';
 import Header from './components/Header';
 import PwaInstallBanner from './components/PwaInstallBanner';
+
+// Helper to compress and resize images on client-side before sending to server to avoid 413 Payload Too Large and maintain speed
+const compressAndResizeImage = (file: File, maxWidth = 800, maxHeight = 800, quality = 0.75): Promise<string> => {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > maxWidth) {
+            height = Math.round((height * maxWidth) / width);
+            width = maxWidth;
+          }
+        } else {
+          if (height > maxHeight) {
+            width = Math.round((width * maxHeight) / height);
+            height = maxHeight;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          resolve(canvas.toDataURL('image/jpeg', quality));
+        } else {
+          resolve(event.target?.result as string);
+        }
+      };
+      img.onerror = () => {
+        resolve(event.target?.result as string);
+      };
+      img.src = event.target?.result as string;
+    };
+    reader.onerror = () => {
+      resolve('');
+    };
+    reader.readAsDataURL(file);
+  });
+};
 
 export default function App() {
   // Authentication states
@@ -2531,45 +2576,47 @@ export default function App() {
 
                               <div>
                                 <label className="block text-zinc-400 font-bold mb-1">Imagem de Capa (Thumbnail)</label>
-                                <div className="flex gap-2">
-                                  <input
-                                    type="text"
-                                    value={myStreamCover}
-                                    onChange={(e) => setMyStreamCover(e.target.value)}
-                                    placeholder="https://images.unsplash.com/... ou escolha um modelo abaixo"
-                                    className="flex-1 bg-zinc-950 border border-zinc-800 focus:border-violet-500 rounded-xl p-3 text-zinc-200 outline-none truncate"
-                                  />
+                                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                                  <label className="flex-1 flex flex-col items-center justify-center border border-dashed border-zinc-850 hover:border-violet-550/60 bg-zinc-950/60 hover:bg-zinc-950 px-4 py-3 rounded-xl cursor-pointer transition-all text-center">
+                                    <div className="flex items-center gap-2 text-zinc-300 text-xs font-bold">
+                                      <Upload className="w-4 h-4 text-violet-400 shrink-0" />
+                                      <span>Escolher Imagem da Galeria 📸</span>
+                                    </div>
+                                    <span className="text-[9px] text-zinc-500 mt-1">Carregue um arquivo de imagem do seu dispositivo</span>
+                                    <input
+                                      type="file"
+                                      accept="image/*"
+                                      onChange={async (e) => {
+                                        const file = e.target.files?.[0];
+                                        if (file) {
+                                          try {
+                                            const compressed = await compressAndResizeImage(file, 800, 800, 0.75);
+                                            setMyStreamCover(compressed);
+                                            addNotification("Imagem de capa importada com sucesso da sua galeria! 📸✨", "success");
+                                          } catch (error) {
+                                            addNotification("Erro ao processar imagem.", "alert");
+                                          }
+                                        }
+                                      }}
+                                      className="hidden"
+                                    />
+                                  </label>
+
                                   {myStreamCover && (
-                                    <img src={myStreamCover} alt="Cover Preview" className="w-12 h-12 rounded-xl object-cover border border-violet-500 shrink-0" />
+                                    <div className="relative shrink-0 flex items-center justify-center bg-zinc-950 p-2 rounded-xl border border-zinc-800">
+                                      <div className="relative">
+                                        <img src={myStreamCover} alt="Cover Preview" className="w-16 h-16 rounded-lg object-cover border border-violet-500 shadow-md" />
+                                        <button
+                                          type="button"
+                                          onClick={() => setMyStreamCover('')}
+                                          className="absolute -top-1.5 -right-1.5 bg-red-650 hover:bg-red-550 rounded-full p-1 text-white text-[9px] shadow-sm cursor-pointer border border-zinc-900 shrink-0"
+                                          title="Remover imagem"
+                                        >
+                                          <X className="w-2.5 h-2.5" />
+                                        </button>
+                                      </div>
+                                    </div>
                                   )}
-                                </div>
-                                
-                                <div className="mt-2">
-                                  <span className="text-[10px] text-zinc-500 font-extrabold uppercase tracking-wider block mb-1">Sugestões de Capas Profissionais:</span>
-                                  <div className="grid grid-cols-5 gap-1.5">
-                                    {[
-                                      { name: 'Voz & Violão', url: 'https://images.unsplash.com/photo-1511192336575-5a79af67a629?w=500' },
-                                      { name: 'PC Gamer', url: 'https://images.unsplash.com/photo-1542751371-adc38448a05e?w=500' },
-                                      { name: 'Moda Show', url: 'https://images.unsplash.com/photo-1487412720507-e7ab37603c6f?w=500' },
-                                      { name: 'Bate-papo', url: 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=500' },
-                                      { name: 'DJs Studio', url: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=500' }
-                                    ].map((preset, i) => (
-                                      <button
-                                        key={i}
-                                        type="button"
-                                        onClick={() => setMyStreamCover(preset.url)}
-                                        className={`relative h-12 rounded-lg overflow-hidden border-2 transition-all cursor-pointer ${
-                                          myStreamCover === preset.url ? 'border-violet-500 scale-102 shadow-[0_0_8px_rgba(139,92,246,0.3)]' : 'border-zinc-800 hover:border-zinc-650'
-                                        }`}
-                                        title={preset.name}
-                                      >
-                                        <img src={preset.url} className="w-full h-full object-cover" alt={preset.name} />
-                                        <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
-                                          <span className="text-[8px] text-zinc-300 font-black truncate max-w-full px-0.5">{preset.name}</span>
-                                        </div>
-                                      </button>
-                                    ))}
-                                  </div>
                                 </div>
                               </div>
 
@@ -3066,46 +3113,48 @@ export default function App() {
                       {/* Right: Avatar image Customiser */}
                       <div className="space-y-3">
                         <div>
-                          <label className="block text-zinc-400 mb-1 font-bold">URL da Foto de Perfil (Avatar)</label>
-                          <div className="flex gap-2">
-                            <input
-                              type="text"
-                              value={profileForm.avatar}
-                              onChange={(e) => setProfileForm({ ...profileForm, avatar: e.target.value })}
-                              placeholder="https://images.unsplash.com/..."
-                              className="flex-1 bg-zinc-950 border border-zinc-800 p-2.5 rounded-xl text-zinc-100 outline-none focus:border-violet-550 transition-colors truncate"
-                            />
-                            {profileForm.avatar && (
-                              <img src={profileForm.avatar} alt="Preview" className="w-10 h-10 rounded-xl object-cover border border-violet-500 shrink-0" />
-                            )}
-                          </div>
-                        </div>
+                          <label className="block text-zinc-400 mb-1 font-bold">Foto de Perfil (Avatar)</label>
+                          <div className="flex flex-col items-stretch gap-3">
+                            <label className="flex-1 flex flex-col items-center justify-center border border-dashed border-zinc-800 hover:border-violet-550/60 bg-zinc-950/60 hover:bg-zinc-950 px-4 py-3 rounded-xl cursor-pointer transition-all text-center">
+                              <div className="flex items-center gap-2 text-zinc-300 text-xs font-bold">
+                                <Upload className="w-4 h-4 text-violet-400 shrink-0" />
+                                <span>Escolher da Galeria 📸</span>
+                              </div>
+                              <span className="text-[9px] text-zinc-500 mt-1">Carregue sua foto do celular ou computador</span>
+                              <input
+                                type="file"
+                                accept="image/*"
+                                onChange={async (e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file) {
+                                    try {
+                                      const compressed = await compressAndResizeImage(file, 400, 400, 0.75);
+                                      setProfileForm({ ...profileForm, avatar: compressed });
+                                      addNotification("Nova foto de perfil carregada da sua galeria! 🥰✨", "success");
+                                    } catch (error) {
+                                      addNotification("Erro ao processar imagem.", "alert");
+                                    }
+                                  }
+                                }}
+                                className="hidden"
+                              />
+                            </label>
 
-                        {/* Quick Presets for Avatars */}
-                        <div>
-                          <span className="text-[10px] text-zinc-500 font-extrabold uppercase tracking-widest block mb-1.5">Sugestões de Fotos de Alto Perfil:</span>
-                          <div className="grid grid-cols-4 gap-1.5">
-                            {[
-                              'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
-                              'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150',
-                              'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150',
-                              'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150',
-                              'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=150',
-                              'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=150',
-                              'https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?w=150',
-                              'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=150'
-                            ].map((url, i) => (
-                              <button
-                                key={i}
-                                type="button"
-                                onClick={() => setProfileForm({ ...profileForm, avatar: url })}
-                                className={`h-11 rounded-lg overflow-hidden border-2 transition-all cursor-pointer ${
-                                  profileForm.avatar === url ? 'border-violet-500 scale-102 shadow-[0_0_8px_rgba(139,92,246,0.3)]' : 'border-zinc-800 opacity-60 hover:opacity-100'
-                                }`}
-                              >
-                                <img src={url} className="w-full h-full object-cover" alt={`Preset ${i}`} />
-                              </button>
-                            ))}
+                            {profileForm.avatar && (
+                              <div className="flex items-center gap-3 bg-zinc-950 p-2.5 rounded-xl border border-zinc-850">
+                                <img src={profileForm.avatar} alt="Preview" className="w-12 h-12 rounded-xl object-cover border-2 border-violet-500 shadow-lg" />
+                                <div className="min-w-0 flex-1">
+                                  <p className="text-zinc-200 text-xs font-bold truncate">Sua Foto de Perfil</p>
+                                  <button
+                                    type="button"
+                                    onClick={() => setProfileForm({ ...profileForm, avatar: '' })}
+                                    className="text-red-400 hover:text-red-300 text-[10px] font-sans font-bold flex items-center gap-1 mt-0.5 cursor-pointer"
+                                  >
+                                    <X className="w-3 h-3" /> Limpar Foto
+                                  </button>
+                                </div>
+                              </div>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -3167,25 +3216,17 @@ export default function App() {
 
                         {/* Grid of 6 Photo Slots inputs & previews */}
                         <div>
-                          <label className="block text-zinc-400 mb-1.5 font-extrabold uppercase text-[10px] tracking-wide">Fotos do Álbum (Máximo 6)</label>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 text-xs">
+                          <label className="block text-zinc-400 mb-1.5 font-extrabold uppercase text-[10px] tracking-wide">Fotos do Álbum Private (Máximo 6)</label>
+                          <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-xs">
                             {[0, 1, 2, 3, 4, 5].map((index) => {
                               const photoUrl = profileForm.hostPhotos[index] || '';
                               return (
-                                <div key={index} className="bg-zinc-900 border border-zinc-800 rounded-xl p-2 relative flex flex-col justify-between gap-1.5">
-                                  <div className="flex items-center gap-1.5">
-                                    <span className="text-[10px] font-mono text-zinc-500 font-bold shrink-0">Slot {index + 1}</span>
-                                    <input
-                                      type="text"
-                                      value={photoUrl}
-                                      onChange={(e) => {
-                                        const updatedPhotos = [...profileForm.hostPhotos];
-                                        updatedPhotos[index] = e.target.value;
-                                        setProfileForm({ ...profileForm, hostPhotos: updatedPhotos });
-                                      }}
-                                      placeholder="https://unsplash.com/..."
-                                      className="flex-1 bg-zinc-950 border border-zinc-850 p-1 rounded-lg text-[10px] outline-none text-zinc-300 truncate"
-                                    />
+                                <div key={index} className="bg-zinc-900 border border-zinc-800 rounded-xl p-2.5 relative flex flex-col justify-between gap-2">
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-[10px] font-mono text-zinc-500 font-bold">Slot {index + 1}</span>
+                                    {photoUrl && (
+                                      <span className="text-[8px] bg-emerald-950 text-emerald-400 font-bold px-1.5 py-0.5 rounded">Ativo 📸</span>
+                                    )}
                                   </div>
 
                                   {photoUrl ? (
@@ -3198,16 +3239,35 @@ export default function App() {
                                           updatedPhotos[index] = '';
                                           setProfileForm({ ...profileForm, hostPhotos: updatedPhotos });
                                         }}
-                                        className="absolute top-1.5 right-1.5 bg-red-600 hover:bg-red-500 text-white rounded-full p-1 shadow-md cursor-pointer transition-all shrink-0"
+                                        className="absolute top-1.5 right-1.5 bg-red-650 hover:bg-red-550 text-white rounded-full p-1 shadow-md cursor-pointer transition-all shrink-0 border border-zinc-900"
                                       >
                                         <X className="w-3 h-3" />
                                       </button>
                                     </div>
                                   ) : (
-                                    <div className="h-28 w-full bg-zinc-950/45 border border-dashed border-zinc-800 rounded-lg flex flex-col items-center justify-center text-zinc-650">
-                                      <Camera className="w-5 h-5 mb-1 opacity-30" />
-                                      <span className="text-[9px]">Sussurrar Link</span>
-                                    </div>
+                                    <label className="h-28 w-full bg-zinc-950/45 border border-dashed border-zinc-800 hover:border-violet-550/40 rounded-lg flex flex-col items-center justify-center text-zinc-500 hover:text-zinc-300 transition-all cursor-pointer">
+                                      <Upload className="w-5 h-5 mb-1 text-violet-400 opacity-65" />
+                                      <span className="text-[9px] font-bold">Upload Galeria</span>
+                                      <input
+                                        type="file"
+                                        accept="image/*"
+                                        onChange={async (e) => {
+                                          const file = e.target.files?.[0];
+                                          if (file) {
+                                            try {
+                                              const compressed = await compressAndResizeImage(file, 800, 800, 0.75);
+                                              const updatedPhotos = [...profileForm.hostPhotos];
+                                              updatedPhotos[index] = compressed;
+                                              setProfileForm({ ...profileForm, hostPhotos: updatedPhotos });
+                                              addNotification(`Foto carregada no Slot ${index + 1}! 📸✨`, "success");
+                                            } catch (error) {
+                                              addNotification("Erro ao processar imagem.", "alert");
+                                            }
+                                          }
+                                        }}
+                                        className="hidden"
+                                      />
+                                    </label>
                                   )}
                                 </div>
                               );
