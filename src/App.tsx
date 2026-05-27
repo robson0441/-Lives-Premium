@@ -13,7 +13,7 @@ import {
   Tv, Flame, TrendingUp, Sparkles, Coins, MessageSquare, Gift, Crown, 
   DollarSign, Users, Settings, Shield, Check, X, Plus, Play, Square, 
   Radio, Video, VideoOff, Mic, MicOff, Smartphone, QrCode, Copy, ArrowUpRight, Lock, Unlock, 
-  Volume2, VolumeX, Award, Heart, HelpCircle, Send, AlertCircle, ChevronRight, UserMinus, LogOut
+  Volume2, VolumeX, Award, Heart, HelpCircle, Send, AlertCircle, ChevronRight, UserMinus, LogOut, Camera
 } from 'lucide-react';
 import { User, LiveRoom, ChatMessage, HostApplication, CoinPackage, Transaction, Gift as GiftType, Withdrawal, UserSubscription } from './types';
 import Header from './components/Header';
@@ -52,6 +52,22 @@ export default function App() {
   const [viewerReactionActive, setViewerReactionActive] = useState(false);
   const [viewerMediaStream, setViewerMediaStream] = useState<MediaStream | null>(null);
 
+  // Photo unlock, full screen zoom and host album states
+  const [viewingHostPhotosId, setViewingHostPhotosId] = useState<string | null>(null);
+  const [viewingHostDetail, setViewingHostDetail] = useState<User | null>(null);
+  const [isPhotoUnlockingLoading, setIsPhotoUnlockingLoading] = useState(false);
+  const [fullScreenPhotoUrl, setFullScreenPhotoUrl] = useState<string | null>(null);
+
+  // Edit profile form state
+  const [profileForm, setProfileForm] = useState({
+    username: '',
+    bio: '',
+    avatar: '',
+    pixKey: '',
+    photosPrice: 0,
+    hostPhotos: [] as string[]
+  });
+
   // Economy & Gift collections
   const [coinPackages, setCoinPackages] = useState<CoinPackage[]>([]);
   const [giftsList, setGiftsList] = useState<GiftType[]>([]);
@@ -77,6 +93,7 @@ export default function App() {
   const [myStreamPrice, setMyStreamPrice] = useState(40);
   const [myStreamVipOnly, setMyStreamVipOnly] = useState(false);
   const [myStreamVipTier, setMyStreamVipTier] = useState<'bronze' | 'gold' | 'diamond'>('bronze');
+  const [myStreamCover, setMyStreamCover] = useState('');
 
   // Withdrawal form
   const [withdrawCoinsAmount, setWithdrawCoinsAmount] = useState(2500);
@@ -215,6 +232,103 @@ export default function App() {
       syncAllCollections({ customUsers: [currentUser] });
     }
   }, [currentUser?.id]);
+
+  // Synchronize profileForm whenever the currentUser changes
+  useEffect(() => {
+    if (currentUser) {
+      setProfileForm({
+        username: currentUser.username || '',
+        bio: currentUser.bio || '',
+        avatar: currentUser.avatar || '',
+        pixKey: currentUser.pixKey || '',
+        photosPrice: currentUser.photosPrice || 0,
+        hostPhotos: currentUser.hostPhotos || []
+      });
+    }
+  }, [currentUser?.id]);
+
+  const handleOpenHostPhotos = async (hostId: string) => {
+    try {
+      const res = await fetch(`/api/users`);
+      if (res.ok) {
+        const usersList: User[] = await res.json();
+        const found = usersList.find(u => u.id === hostId);
+        if (found) {
+          setViewingHostDetail(found);
+          setViewingHostPhotosId(hostId);
+        } else {
+          addNotification("Host não encontrado.", "alert");
+        }
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleUnlockHostPhotos = async (hostId: string) => {
+    if (!currentUser) return;
+    setIsPhotoUnlockingLoading(true);
+    try {
+      const res = await fetch(`/api/hosts/${hostId}/unlock-photos`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-id': currentUser.id
+        }
+      });
+      const data = await res.json();
+      if (res.ok) {
+        addNotification("Álbum Premium liberado com sucesso! Divirta-se! 🎉💥", "success");
+        setCurrentUser(data.user);
+        setViewingHostDetail(data.host);
+        await syncAllCollections({ customUsers: [data.user, data.host] });
+      } else {
+        addNotification(data.error || "Erro ao desbloquear fotos.", "alert");
+      }
+    } catch (err) {
+      console.error(err);
+      addNotification("Erro de conexão.", "alert");
+    } finally {
+      setIsPhotoUnlockingLoading(false);
+    }
+  };
+
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
+
+  const handleSaveProfile = async () => {
+    if (!currentUser) return;
+    setIsSavingProfile(true);
+    try {
+      const res = await fetch('/api/user/update', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-id': currentUser.id
+        },
+        body: JSON.stringify({
+          username: profileForm.username,
+          bio: profileForm.bio,
+          avatar: profileForm.avatar,
+          pixKey: profileForm.pixKey,
+          photosPrice: profileForm.photosPrice,
+          hostPhotos: profileForm.hostPhotos.filter(p => p && p.trim() !== '')
+        })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setCurrentUser(data.user);
+        await syncAllCollections({ customUsers: [data.user] });
+        addNotification("Seu perfil foi atualizado com sucesso! ✨🚀", "success");
+      } else {
+        addNotification(data.error || "Erro ao atualizar perfil.", "alert");
+      }
+    } catch (e) {
+      console.error(e);
+      addNotification("Erro ao salvar perfil.", "alert");
+    } finally {
+      setIsSavingProfile(false);
+    }
+  };
 
   // Update dynamic logs and workspace permissions when currentUser state changes (e.g., toggled roles)
   useEffect(() => {
@@ -992,11 +1106,13 @@ export default function App() {
           vipMinLevel: myStreamVipTier,
           isPrivate: myStreamPrivate,
           entryCoinsPrice: myStreamPrice,
-          thumbnail: myStreamCategory === 'Jogos' 
-            ? 'https://images.unsplash.com/photo-1542751371-adc38448a05e?w=800' 
-            : myStreamCategory === 'Música'
-            ? 'https://images.unsplash.com/photo-1511192336575-5a79af67a629?w=800'
-            : 'https://images.unsplash.com/photo-1487412720507-e7ab37603c6f?w=800'
+          thumbnail: myStreamCover ? myStreamCover.trim() : (
+            myStreamCategory === 'Jogos' 
+              ? 'https://images.unsplash.com/photo-1542751371-adc38448a05e?w=800' 
+              : myStreamCategory === 'Música'
+              ? 'https://images.unsplash.com/photo-1511192336575-5a79af67a629?w=800'
+              : 'https://images.unsplash.com/photo-1487412720507-e7ab37603c6f?w=800'
+          )
         })
       });
 
@@ -1538,7 +1654,12 @@ export default function App() {
                 {/* Close/Back button */}
                 <button
                   id="btn-close-theatre"
-                  onClick={() => setActiveRoom(null)}
+                  onClick={() => {
+                    if (activeRoom && activeRoom.hostId === currentUser?.id) {
+                      addNotification("Você saiu do player, mas sua transmissão continua ATIVA! Para encerrar totalmente, vá na Host Zone ou utilize o botão vermelho no menu.", "info");
+                    }
+                    setActiveRoom(null);
+                  }}
                   className="w-8 h-8 rounded-full bg-zinc-950/80 hover:bg-zinc-900 border border-zinc-800 backdrop-blur-md flex items-center justify-center text-white transition-transform hover:scale-115 active:scale-90 cursor-pointer"
                 >
                   <X className="w-4 h-4" />
@@ -1629,6 +1750,14 @@ export default function App() {
                           <Sparkles className="w-3.5 h-3.5 md:w-4 md:h-4 text-violet-300 animate-pulse" />
                         </button>
                       )}
+
+                      <button
+                        onClick={() => handleEndLiveStream(activeRoom.id)}
+                        className="bg-red-650 hover:bg-red-550 border border-red-900 text-white font-sans font-black text-[10px] md:text-xs px-2.5 py-1.5 md:px-3 md:py-2 rounded-lg md:rounded-xl uppercase tracking-wider transition-all cursor-pointer shrink-0 animate-pulse"
+                        title="Encerrar transmissão ao vivo de vez"
+                      >
+                        🔴 Encerrar Live
+                      </button>
                     </>
                   ) : (
                     <>
@@ -1653,6 +1782,13 @@ export default function App() {
                     title={streamMuted ? "Tirar do Mudo" : "Mutar Áudio da Stream"}
                   >
                     {streamMuted ? <VolumeX className="w-3.5 h-3.5 md:w-4 md:h-4 text-red-400" /> : <Volume2 className="w-3.5 h-3.5 md:w-4 md:h-4 text-emerald-400" />}
+                  </button>
+
+                  <button
+                    onClick={() => handleOpenHostPhotos(activeRoom.hostId)}
+                    className="flex items-center gap-1 bg-gradient-to-r from-purple-600 to-fuchsia-600 hover:from-purple-700 hover:to-fuchsia-700 text-white font-bold text-[9px] md:text-xs px-2.5 py-1.5 md:px-4 md:py-2 rounded-lg md:rounded-xl transition-all font-sans uppercase shadow-[0_0_15px_rgba(168,85,247,0.35)] cursor-pointer shrink-0"
+                  >
+                    📸 Fotos Privadas
                   </button>
 
                   <button
@@ -2010,23 +2146,36 @@ export default function App() {
                               </div>
                             </div>
 
-                            {/* Details Room footer metadata */}
-                            <div className="p-4 flex items-start gap-2.5">
-                              <img
-                                src={room.hostAvatar}
-                                alt={room.hostName}
-                                className="w-9 h-9 rounded-full object-cover border border-violet-500"
-                              />
-                              <div className="flex-1 min-w-0">
-                                <h4 className="font-bold text-xs text-white leading-tight truncate group-hover:text-violet-400 transition-colors">
-                                  {room.title}
-                                </h4>
-                                <div className="flex items-center gap-1.5 mt-1 text-[11px] text-zinc-400">
-                                  <span className="font-semibold text-zinc-350">{room.hostName}</span>
-                                  <span className="w-1 h-1 rounded-full bg-zinc-750" />
-                                  <span className="text-violet-400 text-[10px]">{room.category}</span>
+                             {/* Details Room footer metadata */}
+                            <div className="p-4 flex items-center justify-between gap-2.5">
+                              <div className="flex items-start gap-2.5 min-w-0">
+                                <img
+                                  src={room.hostAvatar}
+                                  alt={room.hostName}
+                                  className="w-9 h-9 rounded-full object-cover border border-violet-500 shrink-0"
+                                />
+                                <div className="min-w-0">
+                                  <h4 className="font-bold text-xs text-white leading-tight truncate group-hover:text-violet-400 transition-colors">
+                                    {room.title}
+                                  </h4>
+                                  <div className="flex items-center gap-1.5 mt-1 text-[11px] text-zinc-400">
+                                    <span className="font-semibold text-zinc-350">{room.hostName}</span>
+                                    <span className="w-1 h-1 rounded-full bg-zinc-750" />
+                                    <span className="text-violet-400 text-[10px]">{room.category}</span>
+                                  </div>
                                 </div>
                               </div>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleOpenHostPhotos(room.hostId);
+                                }}
+                                className="bg-zinc-950/80 hover:bg-violet-950 text-zinc-300 hover:text-violet-450 border border-zinc-800 hover:border-violet-750 p-2 rounded-xl transition-all flex items-center justify-center cursor-pointer shrink-0"
+                                title="Ver Álbum de Fotos do Host 📸"
+                              >
+                                <Camera className="w-4 h-4 text-violet-400" />
+                              </button>
                             </div>
                           </div>
                         ))}
@@ -2041,11 +2190,19 @@ export default function App() {
                     </h3>
                     <div className="grid grid-cols-3 gap-2.5">
                       {(rankings.topHosts || []).slice(0, 3).map((host: any, idx) => (
-                        <div key={idx} className="bg-zinc-900 border border-zinc-800/80 p-3 rounded-2.5xl text-center flex flex-col items-center">
-                          <img src={host.avatar} className="w-12 h-12 rounded-full border border-zinc-700 object-cover shadow-sm mb-1.5" />
-                          <span className="text-[10px] font-extrabold text-white truncate w-full">{host.username}</span>
-                          <span className="text-[9px] text-zinc-400 font-mono mt-0.5">{host.followersCount} seguidores</span>
-                        </div>
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => handleOpenHostPhotos(host.id)}
+                          className="bg-zinc-900 hover:bg-zinc-850 border border-zinc-800/80 hover:border-violet-500/50 p-3 rounded-2.5xl text-center flex flex-col items-center transition-all cursor-pointer group"
+                        >
+                          <div className="relative mb-1.5 shrink-0">
+                            <img src={host.avatar} className="w-12 h-12 rounded-full border border-zinc-750 object-cover shadow-sm group-hover:border-violet-500 transition-colors" />
+                            <span className="absolute bottom-0 right-0 bg-zinc-900 border border-zinc-850 text-[8px] p-0.5 rounded-full">📸</span>
+                          </div>
+                          <span className="text-[10px] font-extrabold text-white truncate w-full group-hover:text-violet-400 transition-colors">{host.username}</span>
+                          <span className="text-[9px] text-zinc-400 font-mono mt-0.5">{host.followersCount} seg.</span>
+                        </button>
                       ))}
                     </div>
                   </div>
@@ -2289,101 +2446,213 @@ export default function App() {
                       </div>
 
                       {/* Stream broadcast control console editor box */}
-                      <div className="bg-zinc-900 border border-zinc-800 p-5 rounded-3xl space-y-4">
-                        <h3 className="font-sans font-extrabold text-sm text-white uppercase tracking-wider mb-2.5 flex items-center gap-1.5 text-zinc-200">
-                          <Video className="w-4 h-4 text-red-500" /> Painel de Transmissão SRS / RTMP
-                        </h3>
-
-                        <div className="grid grid-cols-1 gap-3.5 text-xs">
-                          <div>
-                            <label className="block text-zinc-400 font-bold mb-1">Título chamativo da Transmissão</label>
-                            <input
-                              type="text"
-                              value={myStreamTitle}
-                              onChange={(e) => setMyStreamTitle(e.target.value)}
-                              placeholder="ex: 🔴 SABADO DE VOZ E VIOLAO! VEM COMIGOO!"
-                              className="w-full bg-zinc-950 border border-zinc-800 focus:border-violet-500 rounded-xl p-3 text-zinc-200 outline-none"
-                            />
-                          </div>
-
-                          <div className="grid grid-cols-2 gap-3">
-                            <div>
-                              <label className="block text-zinc-400 font-bold mb-1">Categoria principal</label>
-                              <select
-                                value={myStreamCategory}
-                                onChange={(e) => setMyStreamCategory(e.target.value)}
-                                className="w-full bg-zinc-950 border border-zinc-800 rounded-xl p-3 text-zinc-200 outline-none"
-                              >
-                                <option value="Bate-papo">Bate-papo</option>
-                                <option value="Música">Música</option>
-                                <option value="Jogos">Jogos</option>
-                                <option value="Moda & Beleza">Moda & Beleza</option>
-                                <option value="Vida Real">Vida Real</option>
-                              </select>
-                            </div>
-
-                            <div>
-                              <label className="block text-zinc-400 font-bold mb-1">Configuração de Acesso</label>
-                              <div className="flex bg-zinc-950 rounded-xl border border-zinc-800 p-0.5">
-                                <button
-                                  type="button"
-                                  onClick={() => setMyStreamPrivate(false)}
-                                  className={`flex-1 text-[10px] uppercase font-bold py-2 rounded-lg cursor-pointer ${!myStreamPrivate ? 'bg-violet-600 text-white' : 'text-zinc-400'}`}
-                                >
-                                  Pública
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => setMyStreamPrivate(true)}
-                                  className={`flex-1 text-[10px] uppercase font-bold py-2 rounded-lg cursor-pointer ${myStreamPrivate ? 'bg-indigo-600 text-white' : 'text-zinc-400'}`}
-                                >
-                                  Privada 🔒
-                                </button>
+                      {(() => {
+                        const currentHostLive = (lives || []).find(r => r.hostId === currentUser?.id && r.isLive);
+                        if (currentHostLive) {
+                          return (
+                            <div className="bg-gradient-to-r from-red-950/20 via-zinc-900 to-red-950/20 border border-red-900/40 p-6 rounded-3xl space-y-4 shadow-xl">
+                              <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
+                                <div className="flex items-center gap-3">
+                                  <span className="relative flex h-3 w-3">
+                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                                    <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+                                  </span>
+                                  <div>
+                                    <p className="font-extrabold text-white text-xs uppercase tracking-wider">Você está ao vivo agora! 🔴</p>
+                                    <p className="text-[10px] text-zinc-400 mt-0.5">Sua transmissão está ativa e visível para a comunidade.</p>
+                                  </div>
+                                </div>
+                                <span className="bg-red-955 text-red-400 border border-red-900/40 text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider font-mono">
+                                  Transmissão Habilitada
+                                </span>
                               </div>
-                            </div>
-                          </div>
 
-                          {/* Conditional Private Option cost */}
-                          {myStreamPrivate && (
-                            <div className="p-3 bg-zinc-950 rounded-xl border border-zinc-850 flex items-center justify-between">
-                              <div>
-                                <span className="text-[10px] font-bold text-zinc-400 block uppercase">Ingresso Cobrado por Fã</span>
-                                <span className="text-[9px] text-zinc-500">Valor fixo de moedas para os usuários liberarem canal privado</span>
-                              </div>
-                              <div className="flex items-center gap-1.5 bg-zinc-900 border border-zinc-800 rounded-xl px-1.5 py-1">
-                                <input
-                                  type="number"
-                                  value={myStreamPrice}
-                                  onChange={(e) => setMyStreamPrice(Number(e.target.value))}
-                                  className="w-12 text-center text-xs bg-transparent border-0 font-bold text-white outline-none font-mono"
+                              {/* Live Details Preview Card */}
+                              <div className="bg-zinc-950/60 p-4 rounded-2xl border border-zinc-850 flex gap-4 text-xs">
+                                <img 
+                                  src={currentHostLive.thumbnail} 
+                                  alt={currentHostLive.title} 
+                                  className="w-24 h-16 rounded-xl object-cover border border-zinc-800 shrink-0"
                                 />
-                                <span className="text-[10px] font-bold text-zinc-400 pl-1">Coins</span>
+                                <div className="flex-1 min-w-0">
+                                  <h4 className="font-black text-white text-sm truncate">{currentHostLive.title || 'Sem título configurado'}</h4>
+                                  <div className="flex flex-wrap items-center gap-2 mt-1.5 text-[10px] text-zinc-400">
+                                    <span className="bg-zinc-900 px-2 py-0.5 rounded-md text-zinc-300 font-semibold">{currentHostLive.category}</span>
+                                    {currentHostLive.isPrivate ? (
+                                      <span className="bg-indigo-950 text-indigo-400 border border-indigo-900/30 px-2 py-0.5 rounded-md font-bold">🔒 Privada ({currentHostLive.entryCoinsPrice || 0} Coins)</span>
+                                    ) : (
+                                      <span className="bg-emerald-955/20 text-emerald-450 border border-emerald-900/30 px-2 py-0.5 rounded-md font-bold">Pública</span>
+                                    )}
+                                    {currentHostLive.isVipOnly && (
+                                      <span className="bg-amber-955/20 text-amber-400 border border-amber-900/30 px-2 py-0.5 rounded-md font-bold">⭐ Apenas VIPs</span>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-2">
+                                <button
+                                  type="button"
+                                  onClick={() => setActiveRoom(currentHostLive)}
+                                  className="w-full bg-gradient-to-r from-violet-600 to-indigo-650 hover:from-violet-500 hover:to-indigo-550 text-white font-sans font-black text-xs py-3.5 rounded-xl uppercase tracking-wider shadow-md transition-all cursor-pointer flex items-center justify-center gap-2"
+                                >
+                                  📺 Voltar e Assistir Meu Chat
+                                </button>
+                                
+                                <button
+                                  type="button"
+                                  onClick={() => handleEndLiveStream(currentHostLive.id)}
+                                  className="w-full bg-red-600 hover:bg-red-500 text-white font-sans font-black text-xs py-3.5 rounded-xl uppercase tracking-wider shadow-md transition-all cursor-pointer flex items-center justify-center gap-2"
+                                >
+                                  🔴 Encerrar Transmissão Ao Vivo
+                                </button>
                               </div>
                             </div>
-                          )}
+                          );
+                        }
 
-                          {/* Extra VIP restrictions option */}
-                          <div className="flex items-center justify-between p-3.5 bg-zinc-950 rounded-xl border border-zinc-800/80">
-                            <div className="gap-0.5 flex flex-col">
-                              <span className="font-bold text-xs text-zinc-300">Restrição de Chat VIP</span>
-                              <span className="text-[10px] text-zinc-500 text-left">Apenas telespectadores com selo VIP podem assistir à stream</span>
+                        return (
+                          <div className="bg-zinc-900 border border-zinc-800 p-5 rounded-3xl space-y-4">
+                            <h3 className="font-sans font-extrabold text-sm text-white uppercase tracking-wider mb-2.5 flex items-center gap-1.5 text-zinc-200">
+                              <Video className="w-4 h-4 text-red-500" /> Painel de Transmissão SRS / RTMP
+                            </h3>
+
+                            <div className="grid grid-cols-1 gap-3.5 text-xs">
+                              <div>
+                                <label className="block text-zinc-400 font-bold mb-1">Título chamativo da Transmissão</label>
+                                <input
+                                  type="text"
+                                  value={myStreamTitle}
+                                  onChange={(e) => setMyStreamTitle(e.target.value)}
+                                  placeholder="ex: 🔴 SABADO DE VOZ E VIOLAO! VEM COMIGOO!"
+                                  className="w-full bg-zinc-950 border border-zinc-800 focus:border-violet-500 rounded-xl p-3 text-zinc-200 outline-none"
+                                />
+                              </div>
+
+                              <div>
+                                <label className="block text-zinc-400 font-bold mb-1">Imagem de Capa (Thumbnail)</label>
+                                <div className="flex gap-2">
+                                  <input
+                                    type="text"
+                                    value={myStreamCover}
+                                    onChange={(e) => setMyStreamCover(e.target.value)}
+                                    placeholder="https://images.unsplash.com/... ou escolha um modelo abaixo"
+                                    className="flex-1 bg-zinc-950 border border-zinc-800 focus:border-violet-500 rounded-xl p-3 text-zinc-200 outline-none truncate"
+                                  />
+                                  {myStreamCover && (
+                                    <img src={myStreamCover} alt="Cover Preview" className="w-12 h-12 rounded-xl object-cover border border-violet-500 shrink-0" />
+                                  )}
+                                </div>
+                                
+                                <div className="mt-2">
+                                  <span className="text-[10px] text-zinc-500 font-extrabold uppercase tracking-wider block mb-1">Sugestões de Capas Profissionais:</span>
+                                  <div className="grid grid-cols-5 gap-1.5">
+                                    {[
+                                      { name: 'Voz & Violão', url: 'https://images.unsplash.com/photo-1511192336575-5a79af67a629?w=500' },
+                                      { name: 'PC Gamer', url: 'https://images.unsplash.com/photo-1542751371-adc38448a05e?w=500' },
+                                      { name: 'Moda Show', url: 'https://images.unsplash.com/photo-1487412720507-e7ab37603c6f?w=500' },
+                                      { name: 'Bate-papo', url: 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=500' },
+                                      { name: 'DJs Studio', url: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=500' }
+                                    ].map((preset, i) => (
+                                      <button
+                                        key={i}
+                                        type="button"
+                                        onClick={() => setMyStreamCover(preset.url)}
+                                        className={`relative h-12 rounded-lg overflow-hidden border-2 transition-all cursor-pointer ${
+                                          myStreamCover === preset.url ? 'border-violet-500 scale-102 shadow-[0_0_8px_rgba(139,92,246,0.3)]' : 'border-zinc-800 hover:border-zinc-650'
+                                        }`}
+                                        title={preset.name}
+                                      >
+                                        <img src={preset.url} className="w-full h-full object-cover" alt={preset.name} />
+                                        <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+                                          <span className="text-[8px] text-zinc-300 font-black truncate max-w-full px-0.5">{preset.name}</span>
+                                        </div>
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                  <label className="block text-zinc-400 font-bold mb-1">Categoria principal</label>
+                                  <select
+                                    value={myStreamCategory}
+                                    onChange={(e) => setMyStreamCategory(e.target.value)}
+                                    className="w-full bg-zinc-950 border border-zinc-800 rounded-xl p-3 text-zinc-200 outline-none"
+                                  >
+                                    <option value="Bate-papo">Bate-papo</option>
+                                    <option value="Música">Música</option>
+                                    <option value="Jogos">Jogos</option>
+                                    <option value="Moda & Beleza">Moda & Beleza</option>
+                                    <option value="Vida Real">Vida Real</option>
+                                  </select>
+                                </div>
+
+                                <div>
+                                  <label className="block text-zinc-400 font-bold mb-1">Configuração de Acesso</label>
+                                  <div className="flex bg-zinc-950 rounded-xl border border-zinc-800 p-0.5">
+                                    <button
+                                      type="button"
+                                      onClick={() => setMyStreamPrivate(false)}
+                                      className={`flex-1 text-[10px] uppercase font-bold py-2 rounded-lg cursor-pointer ${!myStreamPrivate ? 'bg-violet-600 text-white' : 'text-zinc-400'}`}
+                                    >
+                                      Pública
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => setMyStreamPrivate(true)}
+                                      className={`flex-1 text-[10px] uppercase font-bold py-2 rounded-lg cursor-pointer ${myStreamPrivate ? 'bg-indigo-600 text-white' : 'text-zinc-400'}`}
+                                    >
+                                      Privada 🔒
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Conditional Private Option cost */}
+                              {myStreamPrivate && (
+                                <div className="p-3 bg-zinc-950 rounded-xl border border-zinc-850 flex items-center justify-between">
+                                  <div>
+                                    <span className="text-[10px] font-bold text-zinc-400 block uppercase">Ingresso Cobrado por Fã</span>
+                                    <span className="text-[9px] text-zinc-500">Valor fixo de moedas para os usuários liberarem canal privado</span>
+                                  </div>
+                                  <div className="flex items-center gap-1.5 bg-zinc-900 border border-zinc-800 rounded-xl px-1.5 py-1">
+                                    <input
+                                      type="number"
+                                      value={myStreamPrice}
+                                      onChange={(e) => setMyStreamPrice(Number(e.target.value))}
+                                      className="w-12 text-center text-xs bg-transparent border-0 font-bold text-white outline-none font-mono"
+                                    />
+                                    <span className="text-[10px] font-bold text-zinc-400 pl-1">Coins</span>
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Extra VIP restrictions option */}
+                              <div className="flex items-center justify-between p-3.5 bg-zinc-950 rounded-xl border border-zinc-800/80">
+                                <div className="gap-0.5 flex flex-col">
+                                  <span className="font-bold text-xs text-zinc-300">Restrição de Chat VIP</span>
+                                  <span className="text-[10px] text-zinc-500 text-left">Apenas telespectadores com selo VIP podem assistir à stream</span>
+                                </div>
+                                <input
+                                  type="checkbox"
+                                  checked={myStreamVipOnly}
+                                  onChange={(e) => setMyStreamVipOnly(e.target.checked)}
+                                  className="w-4 h-4 text-violet-600 bg-zinc-900 rounded border-zinc-800 cursor-pointer"
+                                />
+                              </div>
                             </div>
-                            <input
-                              type="checkbox"
-                              checked={myStreamVipOnly}
-                              onChange={(e) => setMyStreamVipOnly(e.target.checked)}
-                              className="w-4 h-4 text-violet-600 bg-zinc-900 rounded border-zinc-800 cursor-pointer"
-                            />
-                          </div>
-                        </div>
 
-                        <button
-                          onClick={handleStartHostLive}
-                          className="w-full bg-gradient-to-r from-red-600 to-pink-600 hover:from-red-500 hover:to-pink-500 text-white font-sans font-black text-xs py-3.5 rounded-xl uppercase tracking-widest shadow-lg transition-transform hover:scale-101 active:scale-99 cursor-pointer flex items-center justify-center gap-2"
-                        >
-                          <Radio className="w-4 h-4 animate-ping text-white shrink-0" /> INICIAR LIVE EM ALTA TAXA DE FRAMES (1080P)
-                        </button>
-                      </div>
+                            <button
+                              onClick={handleStartHostLive}
+                              className="w-full bg-gradient-to-r from-red-600 to-pink-600 hover:from-red-500 hover:to-pink-500 text-white font-sans font-black text-xs py-3.5 rounded-xl uppercase tracking-widest shadow-lg transition-transform hover:scale-101 active:scale-99 cursor-pointer flex items-center justify-center gap-2"
+                            >
+                              <Radio className="w-4 h-4 animate-ping text-white shrink-0" /> INICIAR LIVE EM ALTA TAXA DE FRAMES (1080P)
+                            </button>
+                          </div>
+                        );
+                      })()}
 
                       {/* Cash Out PIX withdrawal request panel */}
                       <form onSubmit={handleRequestWithdrawal} className="bg-zinc-900 border border-zinc-800 p-5 rounded-3xl space-y-4">
@@ -2745,51 +3014,219 @@ export default function App() {
                     </button>
                   </div>
 
-                  {/* Simple Profile settings editor block */}
-                  <div className="bg-zinc-900 border border-zinc-800 p-4 rounded-3xl text-xs space-y-3">
-                    <p className="font-extrabold text-white text-xs uppercase tracking-wider mb-2">Editar Perfil</p>
-                    <div className="grid grid-cols-2 gap-2 text-xs">
+                  {/* Premium Profile settings editor block */}
+                  <div className="bg-zinc-900 border border-zinc-800 p-5 rounded-3xl text-xs space-y-4 shadow-xl">
+                    <div className="flex items-center justify-between border-b border-zinc-855 pb-2.5">
                       <div>
-                        <label className="block text-zinc-500 mb-1 font-semibold">Chave PIX (Para saques)</label>
-                        <input
-                          type="text"
-                          value={currentUser.pixKey || ''}
-                          onChange={async (e) => {
-                            const newKey = e.target.value;
-                            setCurrentUser(prev => prev ? { ...prev, pixKey: newKey } : null);
-                            try {
-                              await fetch('/api/user/update', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json', 'x-user-id': currentUser.id },
-                                body: JSON.stringify({ pixKey: newKey })
-                              });
-                            } catch (err) {}
-                          }}
-                          placeholder="ex: CPF, Telefone ou E-mail"
-                          className="w-full bg-zinc-950 border border-zinc-800 p-2 rounded-xl text-zinc-100 outline-none"
-                        />
+                        <p className="font-extrabold text-white text-xs uppercase tracking-wider">Painel do Perfil</p>
+                        <p className="text-[10px] text-zinc-400 mt-0.5">Altere seus dados de exibição e gerencie seus conteúdos estéticos.</p>
+                      </div>
+                      <span className="bg-violet-950 text-violet-400 border border-violet-800/40 text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider font-mono">
+                        {currentUser.role === 'host' ? 'Conta Host Premium' : 'Conta Telespectador'}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                      {/* Left: General data */}
+                      <div className="space-y-3">
+                        <div>
+                          <label className="block text-zinc-400 mb-1 font-bold">Nome de Exibição / Canal</label>
+                          <input
+                            type="text"
+                            value={profileForm.username}
+                            onChange={(e) => setProfileForm({ ...profileForm, username: e.target.value })}
+                            placeholder="Seu lindo nome"
+                            className="w-full bg-zinc-950 border border-zinc-800 p-2.5 rounded-xl text-zinc-100 outline-none focus:border-violet-500 transition-colors"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-zinc-400 mb-1 font-bold">Biografia Curta</label>
+                          <textarea
+                            value={profileForm.bio}
+                            onChange={(e) => setProfileForm({ ...profileForm, bio: e.target.value })}
+                            placeholder="Fale um pouco sobre você..."
+                            rows={3}
+                            className="w-full bg-zinc-950 border border-zinc-800 p-2.5 rounded-xl text-zinc-100 outline-none focus:border-violet-550 transition-colors resize-none leading-normal"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-zinc-400 mb-1 font-bold">Chave PIX (Para Recebimentos)</label>
+                          <input
+                            type="text"
+                            value={profileForm.pixKey}
+                            onChange={(e) => setProfileForm({ ...profileForm, pixKey: e.target.value })}
+                            placeholder="E-mail, CPF ou Telefone"
+                            className="w-full bg-zinc-950 border border-zinc-800 p-2.5 rounded-xl text-zinc-100 outline-none focus:border-violet-550 transition-colors"
+                          />
+                        </div>
                       </div>
 
-                      <div>
-                        <label className="block text-zinc-500 mb-1 font-semibold">Biografia Curta</label>
-                        <input
-                          type="text"
-                          value={currentUser.bio || ''}
-                          onChange={async (e) => {
-                            const newBio = e.target.value;
-                            setCurrentUser(prev => prev ? { ...prev, bio: newBio } : null);
-                            try {
-                              await fetch('/api/user/update', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json', 'x-user-id': currentUser.id },
-                                body: JSON.stringify({ bio: newBio })
-                              });
-                            } catch (err) {}
-                          }}
-                          placeholder="Minha apresentação!"
-                          className="w-full bg-zinc-950 border border-zinc-800 p-2 rounded-xl text-zinc-100 outline-none"
-                        />
+                      {/* Right: Avatar image Customiser */}
+                      <div className="space-y-3">
+                        <div>
+                          <label className="block text-zinc-400 mb-1 font-bold">URL da Foto de Perfil (Avatar)</label>
+                          <div className="flex gap-2">
+                            <input
+                              type="text"
+                              value={profileForm.avatar}
+                              onChange={(e) => setProfileForm({ ...profileForm, avatar: e.target.value })}
+                              placeholder="https://images.unsplash.com/..."
+                              className="flex-1 bg-zinc-950 border border-zinc-800 p-2.5 rounded-xl text-zinc-100 outline-none focus:border-violet-550 transition-colors truncate"
+                            />
+                            {profileForm.avatar && (
+                              <img src={profileForm.avatar} alt="Preview" className="w-10 h-10 rounded-xl object-cover border border-violet-500 shrink-0" />
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Quick Presets for Avatars */}
+                        <div>
+                          <span className="text-[10px] text-zinc-500 font-extrabold uppercase tracking-widest block mb-1.5">Sugestões de Fotos de Alto Perfil:</span>
+                          <div className="grid grid-cols-4 gap-1.5">
+                            {[
+                              'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
+                              'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150',
+                              'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150',
+                              'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150',
+                              'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=150',
+                              'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=150',
+                              'https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?w=150',
+                              'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=150'
+                            ].map((url, i) => (
+                              <button
+                                key={i}
+                                type="button"
+                                onClick={() => setProfileForm({ ...profileForm, avatar: url })}
+                                className={`h-11 rounded-lg overflow-hidden border-2 transition-all cursor-pointer ${
+                                  profileForm.avatar === url ? 'border-violet-500 scale-102 shadow-[0_0_8px_rgba(139,92,246,0.3)]' : 'border-zinc-800 opacity-60 hover:opacity-100'
+                                }`}
+                              >
+                                <img src={url} className="w-full h-full object-cover" alt={`Preset ${i}`} />
+                              </button>
+                            ))}
+                          </div>
+                        </div>
                       </div>
+                    </div>
+
+                    {/* Hosts Private Albums Configuration section */}
+                    {currentUser.role === 'host' && (
+                      <div className="bg-zinc-950 p-4 rounded-2xl border border-zinc-850 mt-4 space-y-4">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-zinc-900 pb-2">
+                          <div>
+                            <span className="font-sans font-black text-xs text-fuchsia-400 uppercase tracking-widest flex items-center gap-1">
+                              📸 ÁLBUM DE FOTOS PRIVADAS DO HOST
+                            </span>
+                            <p className="text-[10px] text-zinc-500 mt-0.5">Adicione até 6 fotos exclusivas. Defina um valor em moedas para que usuários liberem o seu álbum inteiro.</p>
+                          </div>
+                          
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const samples = [
+                                'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=500',
+                                'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=500',
+                                'https://images.unsplash.com/photo-1488426862026-3ee34a7d66df?w=500',
+                                'https://images.unsplash.com/photo-1523264629844-40dd6bf17c2b?w=500',
+                                'https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=500',
+                                'https://images.unsplash.com/photo-1511192336575-5a79af67a629?w=500'
+                              ];
+                              setProfileForm(prev => ({
+                                ...prev,
+                                hostPhotos: samples,
+                                photosPrice: prev.photosPrice || 15
+                              }));
+                              addNotification("Amostras lindas inseridas no formulário! Clique em salvar abaixo para registrar! ✨", "success");
+                            }}
+                            className="bg-zinc-90 w-auto hover:bg-zinc-850 text-fuchsia-400 border border-fuchsia-900/40 text-[9px] uppercase font-bold px-2.5 py-1 rounded-lg cursor-pointer shrink-0 transition-all"
+                          >
+                            Injetar Amostra Estética ✨
+                          </button>
+                        </div>
+
+                        {/* Coin cost input */}
+                        <div className="max-w-xs text-xs">
+                          <label className="block text-zinc-400 mb-1 font-bold">Definir Preço do Álbum (Moedas por Liberação)</label>
+                          <div className="relative">
+                            <span className="absolute left-3 top-2 text-amber-500 font-bold text-xs">🪙</span>
+                            <input
+                              type="number"
+                              min="0"
+                              value={profileForm.photosPrice}
+                              onChange={(e) => setProfileForm({ ...profileForm, photosPrice: Math.max(0, parseInt(e.target.value) || 0) })}
+                              placeholder="ex: 15"
+                              className="w-full bg-zinc-900 border border-zinc-800 p-1.5 pl-8 rounded-lg text-zinc-100 outline-none font-mono font-bold text-xs"
+                            />
+                          </div>
+                          <span className="text-[10px] text-zinc-500 block mt-1 leading-normal">
+                            Se deixar como 0 moedas, todos os usuários do app podem assistir suas fotos sem custo!
+                          </span>
+                        </div>
+
+                        {/* Grid of 6 Photo Slots inputs & previews */}
+                        <div>
+                          <label className="block text-zinc-400 mb-1.5 font-extrabold uppercase text-[10px] tracking-wide">Fotos do Álbum (Máximo 6)</label>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 text-xs">
+                            {[0, 1, 2, 3, 4, 5].map((index) => {
+                              const photoUrl = profileForm.hostPhotos[index] || '';
+                              return (
+                                <div key={index} className="bg-zinc-900 border border-zinc-800 rounded-xl p-2 relative flex flex-col justify-between gap-1.5">
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="text-[10px] font-mono text-zinc-500 font-bold shrink-0">Slot {index + 1}</span>
+                                    <input
+                                      type="text"
+                                      value={photoUrl}
+                                      onChange={(e) => {
+                                        const updatedPhotos = [...profileForm.hostPhotos];
+                                        updatedPhotos[index] = e.target.value;
+                                        setProfileForm({ ...profileForm, hostPhotos: updatedPhotos });
+                                      }}
+                                      placeholder="https://unsplash.com/..."
+                                      className="flex-1 bg-zinc-950 border border-zinc-850 p-1 rounded-lg text-[10px] outline-none text-zinc-300 truncate"
+                                    />
+                                  </div>
+
+                                  {photoUrl ? (
+                                    <div className="h-28 w-full bg-zinc-950 rounded-lg overflow-hidden relative group">
+                                      <img src={photoUrl} className="w-full h-full object-cover" alt={`Album ${index + 1}`} />
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          const updatedPhotos = [...profileForm.hostPhotos];
+                                          updatedPhotos[index] = '';
+                                          setProfileForm({ ...profileForm, hostPhotos: updatedPhotos });
+                                        }}
+                                        className="absolute top-1.5 right-1.5 bg-red-600 hover:bg-red-500 text-white rounded-full p-1 shadow-md cursor-pointer transition-all shrink-0"
+                                      >
+                                        <X className="w-3 h-3" />
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    <div className="h-28 w-full bg-zinc-950/45 border border-dashed border-zinc-800 rounded-lg flex flex-col items-center justify-center text-zinc-650">
+                                      <Camera className="w-5 h-5 mb-1 opacity-30" />
+                                      <span className="text-[9px]">Sussurrar Link</span>
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Submit Changes Button wrapper */}
+                    <div className="flex justify-end pt-2 border-t border-zinc-855">
+                      <button
+                        type="button"
+                        disabled={isSavingProfile}
+                        onClick={handleSaveProfile}
+                        className="bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-550 hover:to-indigo-550 disabled:from-zinc-800 disabled:to-zinc-800 text-white text-xs font-black uppercase tracking-wider px-5 py-2.5 rounded-xl transition-all shadow-md cursor-pointer"
+                      >
+                        {isSavingProfile ? 'Gravando Dados...' : 'Confirmar e Salvar Perfil 💾✨'}
+                      </button>
                     </div>
                   </div>
 
@@ -3053,6 +3490,185 @@ export default function App() {
             </div>
 
           </div>
+        </div>
+      )}
+
+      {/* ---------------------------------------------------- */}
+      {/* POPUP 3: HOST PRIVATE PHOTO ALBUM & UNLOCKS MODAL     */}
+      {/* ---------------------------------------------------- */}
+      {viewingHostPhotosId && viewingHostDetail && (
+        <div id="host-album-viewer-modal" className="fixed inset-0 bg-black/85 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-3xl max-w-xl w-full p-6 space-y-4 shadow-3xl relative">
+            
+            {/* Modal Exit */}
+            <button
+              onClick={() => { setViewingHostPhotosId(null); setViewingHostDetail(null); }}
+              className="absolute top-5 right-5 w-8 h-8 rounded-full bg-zinc-950 hover:bg-zinc-850 flex items-center justify-center text-zinc-400 cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            {/* Host header card info */}
+            <div className="flex items-center gap-3 border-b border-zinc-800 pb-3">
+              <img
+                src={viewingHostDetail.avatar}
+                alt={viewingHostDetail.username}
+                className="w-12 h-12 rounded-full object-cover border-2 border-violet-500"
+              />
+              <div className="min-w-0 flex-1">
+                <span className="text-[10px] uppercase font-bold text-violet-400 font-mono tracking-wider">Perfil do Host</span>
+                <h3 className="font-sans font-black text-white text-sm leading-tight">{viewingHostDetail.username}</h3>
+                <p className="text-zinc-400 text-xs truncate max-w-xs">{viewingHostDetail.bio || 'Sem biografia adicional.'}</p>
+              </div>
+            </div>
+
+            {(() => {
+              // Decide if photos are unlocked
+              const isOwner = currentUser?.id === viewingHostDetail.id;
+              const isFree = !viewingHostDetail.photosPrice || viewingHostDetail.photosPrice <= 0;
+              const isUnlocked = currentUser?.unlockedHostsPhotos?.includes(viewingHostDetail.id);
+              const isAdmin = currentUser?.role === 'admin';
+              const albumHasAccess = isOwner || isFree || isUnlocked || isAdmin;
+              
+              const price = viewingHostDetail.photosPrice || 0;
+              const hostPhotosCount = (viewingHostDetail.hostPhotos || []).filter(p => p && p.trim() !== '').length;
+
+              if (albumHasAccess) {
+                // Render host photos
+                return (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-zinc-200 uppercase tracking-wider flex items-center gap-1">
+                        📸 Álbum de Fotos Premium ({hostPhotosCount} Fotos)
+                      </span>
+                      {isOwner && (
+                        <span className="bg-violet-950 text-violet-400 text-[9px] font-bold px-2 py-0.5 rounded-full">Seu Álbum</span>
+                      )}
+                      {!isOwner && isFree && (
+                        <span className="bg-emerald-950 text-emerald-400 text-[9px] font-bold px-2 py-0.5 rounded-full">Álbum Grátis</span>
+                      )}
+                      {!isOwner && !isFree && isUnlocked && (
+                        <span className="bg-amber-950 text-amber-400 text-[9px] font-bold px-2 py-0.5 rounded-full">Desbloqueado</span>
+                      )}
+                    </div>
+
+                    {hostPhotosCount === 0 ? (
+                      <div className="bg-zinc-950/50 p-8 rounded-2xl border border-dashed border-zinc-800 text-center">
+                        <Camera className="w-8 h-8 text-zinc-700 mx-auto mb-2" />
+                        <p className="text-zinc-500 text-xs">Este host ainda não adicionou fotos ao álbum privado.</p>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                        {viewingHostDetail.hostPhotos?.filter(url => url && url.trim() !== '').map((url, i) => (
+                          <div
+                            key={i}
+                            onClick={() => setFullScreenPhotoUrl(url)}
+                            className="group relative h-28 rounded-xl overflow-hidden bg-zinc-950 border border-zinc-800 cursor-zoom-in hover:border-violet-500 transition-all shadow-md shrink-0"
+                          >
+                            <img
+                              src={url}
+                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                              alt={`Host Album Photo ${i + 1}`}
+                            />
+                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-[10px] font-bold">
+                              Clique para Ampliar 🔍
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              } else {
+                // Render locked visual layout
+                return (
+                  <div className="bg-zinc-950/80 border border-violet-900/30 rounded-2xl p-6 text-center space-y-4 shadow-inner">
+                    <div className="w-14 h-14 rounded-full bg-violet-950/60 border border-violet-850 flex items-center justify-center mx-auto shadow-lg">
+                      <Lock className="w-6 h-6 text-violet-400 animate-pulse" />
+                    </div>
+
+                    <div>
+                      <h4 className="font-sans font-black text-white text-sm uppercase tracking-wide">Álbum Privado Exclusivo</h4>
+                      <p className="text-zinc-400 text-xs mt-1.5 leading-normal max-w-sm mx-auto">
+                        Este host compartilhou conteúdos fotográficos premium super pessoais. Desbloqueie em definitivo o álbum completo de {viewingHostDetail.username}!
+                      </p>
+                    </div>
+
+                    {/* Cost frame and user balance */}
+                    <div className="bg-zinc-900 border border-zinc-850 p-3 rounded-xl max-w-xs mx-auto grid grid-cols-2 gap-2 text-center text-xs">
+                      <div>
+                        <span className="text-[10px] text-zinc-500 block uppercase font-bold">Acesso Completo</span>
+                        <span className="font-mono text-xs text-amber-400 font-extrabold flex items-center justify-center gap-0.5 mt-0.5">
+                          🪙 {price} Moedas
+                        </span>
+                      </div>
+                      <div className="border-l border-zinc-800">
+                        <span className="text-[10px] text-zinc-500 block uppercase font-bold">Seu Saldo</span>
+                        <span className="font-mono text-xs text-zinc-200 font-extrabold flex items-center justify-center gap-0.5 mt-0.5">
+                          🪙 {currentUser?.walletCoins || 0} Moedas
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Actions unlock with checking */}
+                    <div className="pt-2 max-w-sm mx-auto">
+                      {currentUser && currentUser.walletCoins >= price ? (
+                        <button
+                          onClick={() => handleUnlockHostPhotos(viewingHostDetail.id)}
+                          disabled={isPhotoUnlockingLoading}
+                          className="w-full bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-550 hover:to-fuchsia-550 text-white font-sans font-bold text-xs uppercase tracking-wider py-3 rounded-xl transition-all shadow-[0_4px_12px_rgba(139,92,246,0.25)] flex items-center justify-center gap-1.5 cursor-pointer"
+                        >
+                          {isPhotoUnlockingLoading ? 'Desbloqueando...' : `Confirmar Liberação por ${price} Moedas 🪙🔒`}
+                        </button>
+                      ) : (
+                        <div className="space-y-2">
+                          <p className="text-red-400 text-[11px] font-bold">🚨 Saldo insuficiente de moedas para liberar o álbum!</p>
+                          <button
+                            onClick={() => {
+                              setViewingHostPhotosId(null);
+                              setViewingHostDetail(null);
+                              setActiveTab('profile');
+                              setShowPixModal(true);
+                            }}
+                            className="w-full bg-amber-550 hover:bg-amber-500 text-zinc-950 font-sans font-black text-xs uppercase tracking-wider py-3 rounded-xl transition-all shadow-[0_4px_12px_rgba(245,158,11,0.25)] cursor-pointer"
+                          >
+                            Recarregar via PIX Instantâneo ⚡🪙
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              }
+            })()}
+
+            {/* Modal footer back info */}
+            <p className="text-[10px] text-zinc-500 text-center uppercase tracking-wide">Desbloqueio definitivo • Apoie diretamente os produtores de conteúdo</p>
+          </div>
+        </div>
+      )}
+
+      {/* ---------------------------------------------------- */}
+      {/* POPUP 4: FULL-SCREEN LIGHTBOX ZOOMED IMAGE           */}
+      {/* ---------------------------------------------------- */}
+      {fullScreenPhotoUrl && (
+        <div
+          id="lightbox-fullscreen"
+          onClick={() => setFullScreenPhotoUrl(null)}
+          className="fixed inset-0 bg-black/95 z-55 flex items-center justify-center p-4 cursor-zoom-out"
+        >
+          <button
+            onClick={() => setFullScreenPhotoUrl(null)}
+            className="absolute top-6 right-6 w-10 h-10 rounded-full bg-zinc-900 border border-zinc-800 flex items-center justify-center text-white cursor-pointer hover:bg-zinc-800 transition-colors shrink-0"
+          >
+            <X className="w-5 h-5" />
+          </button>
+          
+          <img
+            src={fullScreenPhotoUrl}
+            className="max-h-[90vh] max-w-[95vw] rounded-2xl shadow-3xl border border-zinc-800 object-contain animate-scale-up"
+            alt="Expanded fullscreen view"
+          />
         </div>
       )}
 

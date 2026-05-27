@@ -22,6 +22,9 @@ export interface User {
   pixKey?: string;
   hostStatus?: HostApplicationStatus;
   password?: string;
+  hostPhotos?: string[];
+  photosPrice?: number;
+  unlockedHostsPhotos?: string[];
 }
 
 export interface LiveRoom {

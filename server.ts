@@ -330,12 +330,18 @@ async function startServer() {
 
   app.post('/api/user/update', (req, res) => {
     const user = getActiveUser(req);
-    const { username, bio, avatar, banner, pixKey } = req.body;
+    const { username, bio, avatar, banner, pixKey, hostPhotos, photosPrice } = req.body;
     if (username) user.username = username;
     if (bio !== undefined) user.bio = bio;
     if (avatar) user.avatar = avatar;
     if (banner) user.banner = banner;
     if (pixKey) user.pixKey = pixKey;
+    if (hostPhotos !== undefined && Array.isArray(hostPhotos)) {
+      user.hostPhotos = hostPhotos.slice(0, 6);
+    }
+    if (photosPrice !== undefined) {
+      user.photosPrice = Number(photosPrice) || 0;
+    }
 
     // Sync user information with live rooms
     Object.keys(db.lives).forEach((liveId) => {
@@ -347,6 +353,68 @@ async function startServer() {
 
     saveDatabase(db);
     res.json({ success: true, user });
+  });
+
+  // Unlock private host photos with coins
+  app.post('/api/hosts/:hostId/unlock-photos', (req, res) => {
+    const user = getActiveUser(req);
+    const { hostId } = req.params;
+
+    const host = db.users[hostId];
+    if (!host) {
+      return res.status(404).json({ error: 'Host não encontrado.' });
+    }
+
+    if (host.role !== 'host') {
+      return res.status(400).json({ error: 'Este usuário não é um receptor/host de fotos.' });
+    }
+
+    if (!user.unlockedHostsPhotos) {
+      user.unlockedHostsPhotos = [];
+    }
+
+    if (user.unlockedHostsPhotos.includes(hostId)) {
+      return res.json({ success: true, message: 'Álbum já liberado.', user, host });
+    }
+
+    const price = host.photosPrice || 0;
+    if (price > 0) {
+      if (user.walletCoins < price) {
+        return res.status(400).json({ error: `Saldo insuficiente! Você precisa de ${price} moedas.` });
+      }
+
+      // Deduct coins from user and award to host
+      user.walletCoins -= price;
+      host.walletCoins = (host.walletCoins || 0) + price;
+
+      // Add transactions
+      db.transactions.push({
+        id: `tx_photo_use_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+        userId: user.id,
+        username: user.username,
+        amountBRL: 0,
+        coins: price,
+        type: 'gift_send',
+        status: 'completed',
+        date: new Date().toISOString()
+      });
+
+      db.transactions.push({
+        id: `tx_photo_get_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+        userId: host.id,
+        username: host.username,
+        amountBRL: 0,
+        coins: price,
+        type: 'gift_receive',
+        status: 'completed',
+        date: new Date().toISOString()
+      });
+    }
+
+    user.unlockedHostsPhotos.push(hostId);
+    saveDatabase(db);
+
+    res.json({ success: true, user, host });
   });
 
   // ----------------------------------------------------
